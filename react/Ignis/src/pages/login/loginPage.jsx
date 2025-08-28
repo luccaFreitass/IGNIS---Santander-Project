@@ -8,6 +8,7 @@ function Login() {
   const [errorMsg, setErrorMsg] = useState("");
   const navigate = useNavigate();  // Inicializa o navigate
 
+  // Usuários de exemplo
   const users = {
     risco: "senha123",
     comercial: "senha456",
@@ -23,7 +24,13 @@ function Login() {
 
     if (users[username] && users[username] === password) {
       sessionStorage.setItem("userType", username);
-      navigate("/cnpj");  // Navega para /cnpj via React Router
+
+      // Direciona de acordo com o tipo de usuário
+      if (username === "risco") {
+        navigate("/risco");
+      } else if (username === "comercial") {
+        navigate("/comercial");
+      }
     } else {
       setErrorMsg("Usuário ou senha inválidos.");
     }

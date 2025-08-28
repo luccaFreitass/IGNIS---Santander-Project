@@ -1,0 +1,97 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.comercial-page {
+  font-family: Arial, sans-serif;
+  min-height: 100vh;
+  background-color: #000000;
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  background-image: url('./src/images/imagemLogin.png');
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center center;
+  background-attachment: fixed;
+  box-sizing: border-box;
+  padding: 0;
+}
+
+.comercial-page::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(circle, rgba(0, 0, 0, 0) 10%, rgba(0, 0, 0, 0.9) 100%);
+  pointer-events: none;
+}
+
+/* Container central */
+.comercial-container {
+  width: 85%;
+  margin: auto;
+  min-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+  background-color: rgba(12, 12, 12, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+  margin-top: 3vh;
+}
+
+/* Título */
+.comercial-header {
+  text-align: center;
+  color: white;
+  font-size: 2rem;
+  margin-bottom: 2rem;
+}
+
+/* Cards */
+.comercial-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+
+.comercial-card {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border-radius: 10px;
+  padding: 1.5rem;
+  color: white;
+  transition: transform 0.2s ease;
+}
+
+.comercial-card:hover {
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.comercial-title {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+  color: #ff4d4d;
+}
+
+.comercial-text {
+  font-size: 0.95rem;
+  line-height: 1.5rem;
+  color: #e5e5e5;
+}
+
+/* Responsivo */
+@media screen and (max-width: 768px) {
+  .comercial-container {
+    width: 95%;
+    padding: 1.2rem;
+  }
+}

@@ -1,0 +1,41 @@
+
+.cnpj-widget {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 12px;
+  border-radius: 10px;
+  margin: 10px;
+  color: white;
+}
+
+.cnpj-widget form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cnpj-widget input {
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #b30000;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.cnpj-widget button {
+  background-color: #b30000;
+  color: white;
+  padding: 8px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-top: 6px;
+}
+
+.cnpj-widget button:hover {
+  background-color: #8e0000;
+}
+
+.error-msg {
+  color: red;
+  font-size: 0.9rem;
+}
