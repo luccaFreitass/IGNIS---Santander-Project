@@ -1,93 +1,168 @@
+/* Reset básico */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  font-family: "InterVariable", sans-serif;
 }
 
+/* Paleta e tokens de cor (mesmo acento do .cnpj-widget) */
+:root {
+  --accent: #b30000;
+  --accent-hover: #8e0000;
+  --card-bg: rgba(3, 3, 3, 0.5);   /* igual ao .cnpj-widget */
+  --text-primary: #ffffff;
+  --text-secondary: #d9d9d9;                    /* fundo escuro */
+}
+
+/* Página */
 .risco-page {
-  font-family: Arial, sans-serif;
   min-height: 100vh;
-  background-color: #000000;
-  position: relative;
   width: 100%;
-  height: 100vh;
+  display: flex;
+  gap: 16px;
+  background: var(--page-bg);
+  color: var(--text-primary);
+  padding: 16px;
   background-image: url('./src/images/imagemLogin.png');
   background-repeat: no-repeat;
   background-size: cover;
   background-position: center center;
   background-attachment: fixed;
-  box-sizing: border-box;
-  padding: 0;
 }
 
-.risco-page::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background: radial-gradient(circle, rgba(0, 0, 0, 0) 10%, rgba(0, 0, 0, 0.9) 100%);
-  pointer-events: none;
-}
-
-/* Container */
-.risco-container {
-  width: 85%;
-  margin: auto;
-  min-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  padding: 2rem;
-  background-color: rgba(12, 12, 12, 0.4);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
-  margin-top: 3vh;
-}
-
-/* Título */
-.risco-header {
-  text-align: center;
-  color: white;
-  font-size: 2rem;
-  margin-bottom: 2rem;
-}
-
-/* Área dos gráficos */
-.risco-charts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 1.5rem;
-}
-
-/* Cada card de gráfico */
-.risco-chart-card {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+/* Sidebar (painel da consulta) — mesma “vibe” do .cnpj-widget */
+.sidebar {
+  width: 320px;
+  min-width: 280px;
+  background: var(--card-bg);
   border-radius: 10px;
-  padding: 1.5rem;
-  color: white;
-  transition: transform 0.2s ease;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  height: fit-content;
 }
 
-.risco-chart-card:hover {
-  transform: translateY(-4px);
-  background: rgba(255, 255, 255, 0.2);
+/* Conteúdo principal */
+.main-content {
+  flex: 1;
+  background: var(--card-bg);
+  border-radius: 10px;
+  padding: 20px;
+  border: 1px solid rgba(255,255,255,0.08);
 }
 
-.risco-chart-title {
+/* Títulos */
+.main-content h1 {
+  font-size: 1.6rem;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.main-content h2 {
   font-size: 1.1rem;
-  font-weight: bold;
-  margin-bottom: 1rem;
-  text-align: center;
-  color: #ff4d4d;
+  margin: 18px 0 10px;
+  color: var(--text-primary);
 }
+
+/* Texto e destaque do perfil */
+.main-content p {
+  color: var(--text-secondary);
+}
+
+.main-content strong {
+  color: var(--accent);
+}
+
+/* Área de gráficos (grid responsivo) */
+.graficos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* Cada cartão/gráfico — mesmo fundo do .cnpj-widget */
+.grafico {
+  background: var(--card-bg);
+  border-radius: 10px;
+  padding: 14px;
+  color: var(--text-primary);
+  border: 1px solid rgba(255,255,255,0.08);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Hover sutil com acento */
+.grafico:hover {
+  transform: translateY(-3px);
+  border-color: rgba(179, 0, 0, 0.45);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+}
+
+/* Acento em divisórias / subtítulos dentro dos gráficos */
+.grafico .section-title {
+  color: var(--accent);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+/* ---- D3: aparência dark para textos, eixos e linhas ---- */
+.grafico svg text {
+  fill: var(--text-secondary);
+  font-size: 12px;
+}
+
+.grafico .axis path,
+.grafico .axis line {
+  stroke: rgba(255,255,255,0.25);
+}
+
+.grafico .grid line {
+  stroke: rgba(255,255,255,0.12);
+}
+
+/* Botões/coisas interativas dentro de .main-content (se precisar) */
+.main-content .btn {
+  background-color: var(--accent);
+  color: #fff;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.main-content .btn:hover {
+  background-color: var(--accent-hover);
+}
+
+.perfil-text {
+  font-weight: 600;
+}
+
+/* Bolinha ao lado (opcional) */
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.dot.madura { background: #08a7cf; }
+.dot.expansao { background: #22b305; }
+.dot.inicio { background: #f5f104; }
+.dot.declinio { background: #8e0000; }
+
+
 
 /* Responsivo */
-@media screen and (max-width: 768px) {
-  .risco-container {
-    width: 95%;
-    padding: 1.2rem;
+@media (max-width: 900px) {
+  .risco-page {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
   }
 }
+
+

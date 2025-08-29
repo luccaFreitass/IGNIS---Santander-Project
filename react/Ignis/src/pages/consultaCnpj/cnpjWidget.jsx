@@ -7,27 +7,14 @@ function CnpjWidget({ onResult }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-
     setErrorMsg("");
 
-    try {
-      // Ajuste: enviar campo "id" em vez de "cnpj"
-      const response = await fetch("http://localhost:8000/predict", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: cnpj }), 
-      });
-
-      if (!response.ok) {
-        throw new Error(`Erro na API: ${response.status}`);
-      }
-
-      const data = await response.json();
-      if (onResult) onResult(data.perfil_predito);
-    } catch (err) {
-      setErrorMsg("Erro ao consultar API.");
-      console.error(err);
+    if (!cnpj.trim()) {
+      setErrorMsg("Digite um CNPJ válido.");
+      return;
     }
+
+    if (onResult) onResult(cnpj);
   }
 
   return (
@@ -39,7 +26,7 @@ function CnpjWidget({ onResult }) {
           id="cnpjInput"
           value={cnpj}
           onChange={(e) => setCnpj(e.target.value)}
-          placeholder="CNPJ_00004"
+          placeholder="CNPJ"
         />
         <button type="submit">Consultar</button>
       </form>

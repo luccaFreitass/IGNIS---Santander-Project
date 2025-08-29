@@ -1,4 +1,6 @@
-
+*{
+  font-family: "InterVariable", sans-serif;
+}
 .cnpj-widget {
   background: rgba(255, 255, 255, 0.08);
   padding: 12px;
