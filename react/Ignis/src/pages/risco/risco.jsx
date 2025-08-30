@@ -47,6 +47,7 @@ function Risco() {
         CNPJ: data.ID || "-",
         razaoSocial: data.razaoSocial || "-",
         setor: data.setor || "-",
+        alertas: data.alertas || "",
       });
 
       setPerfil(data.perfil_predito || "-");
@@ -119,6 +120,20 @@ function Risco() {
               )}
             </p>
             <p><strong>Setor:</strong> {empresaDados.setor}</p>
+            <p>
+            <strong>Alertas de Fraude:</strong>{" "}
+            {empresaDados.alertas && empresaDados.alertas.trim() !== "" ? (
+              <span id="alertaIdentificado">
+                {empresaDados.alertas}
+              </span>
+            ) : (
+              <span id="semAlertas">
+                Nenhuma fraude detectada
+              </span>
+            )}
+          </p>
+
+
           </div>
 
           <div className="card chart-card">

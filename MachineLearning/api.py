@@ -38,10 +38,11 @@ def treinar_modelo():
     df["ID"] = df["ID"].astype(str).str.strip()
     df['IDADE_EMPRESA'] = (datetime.now() - pd.to_datetime(df['DT_ABRT'])).dt.days / 365
 
+    # Normalizar texto
     for col in ['DS_CNAE', 'DS_TRAN']:
-        df[col] = df[col].apply(normalizar)
+        df[col] = df[col].astype(str).apply(normalizar)
 
-    X = df[feature_cols]
+    X = df[feature_cols].copy()
     y = df[target_col]
 
     # Encoders
@@ -102,7 +103,7 @@ async def predict_perfil(data: IDRequest):
     empresa_proc['IDADE_EMPRESA'] = (datetime.now() - pd.to_datetime(empresa_proc['DT_ABRT'])).dt.days / 365
 
     for col in ['DS_CNAE', 'DS_TRAN']:
-        empresa_proc[col] = empresa_proc[col].apply(normalizar)
+        empresa_proc[col] = empresa_proc[col].astype(str).apply(normalizar)
         empresa_proc[col] = label_encoders[col].transform(empresa_proc[col])
 
     empresa_proc[num_cols] = scaler.transform(empresa_proc[num_cols])
@@ -112,9 +113,15 @@ async def predict_perfil(data: IDRequest):
     perfil_predito = model.predict(empresa_proc)[0]
     print(f"[INFO] Perfil previsto para {id_input}: {perfil_predito}")
 
+    # Tratar alertas (PREV)
+    alerta = empresa.iloc[0].get("PREV", "")
+    if pd.isna(alerta) or str(alerta).strip() == "":
+        alerta = "Nenhuma fraude detectada"
+
     return {
         "ID": id_input,
         "razaoSocial": "Empresa Fictícia",
         "setor": empresa.iloc[0]["DS_CNAE"],
-        "perfil_predito": perfil_predito
+        "perfil_predito": perfil_predito,
+        "alertas": alerta
     }
