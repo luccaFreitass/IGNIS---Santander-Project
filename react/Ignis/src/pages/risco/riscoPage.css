@@ -6,13 +6,14 @@
   font-family: "InterVariable", sans-serif;
 }
 
-/* Paleta e tokens de cor (mesmo acento do .cnpj-widget) */
+/* Paleta de cores */
 :root {
   --accent: #b30000;
   --accent-hover: #8e0000;
-  --card-bg: rgba(3, 3, 3, 0.5);   /* igual ao .cnpj-widget */
+  --card-bg: rgba(3, 3, 3, 0.8);   
   --text-primary: #ffffff;
-  --text-secondary: #d9d9d9;                    /* fundo escuro */
+  --text-secondary: #d9d9d9;                    
+  --sidebar-bg: rgba(0,0,0,0.6);
 }
 
 /* Página */
@@ -21,45 +22,70 @@
   width: 100%;
   display: flex;
   gap: 16px;
-  background: var(--page-bg);
-  color: var(--text-primary);
-  padding: 16px;
   background-image: url('./src/images/imagemLogin.png');
   background-repeat: no-repeat;
   background-size: cover;
   background-position: center center;
   background-attachment: fixed;
+  padding: 16px;
+  color: var(--text-primary);
 }
 
-/* Sidebar (painel da consulta) — mesma “vibe” do .cnpj-widget */
+/* Sidebar */
 .sidebar {
-  width: 320px;
+  width: 300px;
   min-width: 280px;
-  background: var(--card-bg);
+  background: var(--sidebar-bg);
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 25vw;
+}
+
+/* Dados da empresa na sidebar */
+.empresa-detalhes {
   border-radius: 10px;
   padding: 12px;
-  border: 1px solid rgba(255,255,255,0.08);
-  height: fit-content;
+  min-width: 230px;
+}
+
+.empresa-detalhes h3 {
+  margin-bottom: 8px;
+  color: var(--accent);
+  font-size: 1.1rem;
+}
+
+.empresa-detalhes p {
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+}
+
+.empresa-detalhes strong {
+  color: var(--accent);
 }
 
 /* Conteúdo principal */
 .main-content {
   flex: 1;
   background: var(--card-bg);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 20px;
   border: 1px solid rgba(255,255,255,0.08);
 }
 
 /* Títulos */
 .main-content h1 {
-  font-size: 1.6rem;
-  margin-bottom: 12px;
+  font-size: 1.8rem;
+  margin-bottom: 14px;
   color: var(--text-primary);
 }
 
 .main-content h2 {
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   margin: 18px 0 10px;
   color: var(--text-primary);
 }
@@ -73,95 +99,104 @@
   color: var(--accent);
 }
 
-/* Área de gráficos (grid responsivo) */
-.graficos {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+/* ------------------ Indicadores de risco ------------------ */
+.risk-indicators {
+  display: flex;
   gap: 12px;
-  margin-top: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
 }
 
-/* Cada cartão/gráfico — mesmo fundo do .cnpj-widget */
-.grafico {
+.indicator-card {
+  flex: 1;
+  min-width: 150px;
   background: var(--card-bg);
-  border-radius: 10px;
-  padding: 14px;
-  color: var(--text-primary);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
   border: 1px solid rgba(255,255,255,0.08);
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Hover sutil com acento */
-.grafico:hover {
-  transform: translateY(-3px);
-  border-color: rgba(179, 0, 0, 0.45);
-  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+.indicator-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
 }
 
-/* Acento em divisórias / subtítulos dentro dos gráficos */
-.grafico .section-title {
+.indicator-card h3 {
+  font-size: 1rem;
+  margin-bottom: 6px;
   color: var(--accent);
+}
+
+.indicator-card p {
+  font-size: 1.2rem;
   font-weight: 600;
-  margin-bottom: 8px;
+  color: var(--text-primary);
 }
 
-/* ---- D3: aparência dark para textos, eixos e linhas ---- */
-.grafico svg text {
-  fill: var(--text-secondary);
-  font-size: 12px;
+/* ------------------ Dashboard grid ------------------ */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
 }
 
-.grafico .axis path,
-.grafico .axis line {
-  stroke: rgba(255,255,255,0.25);
-}
-
-.grafico .grid line {
-  stroke: rgba(255,255,255,0.12);
-}
-
-/* Botões/coisas interativas dentro de .main-content (se precisar) */
-.main-content .btn {
-  background-color: var(--accent);
-  color: #fff;
-  padding: 8px 12px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.main-content .btn:hover {
-  background-color: var(--accent-hover);
-}
-
-.perfil-text {
-  font-weight: 600;
-}
-
-/* Bolinha ao lado (opcional) */
-.dot {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  margin-left: 8px;
-  vertical-align: middle;
-}
-.dot.madura { background: #08a7cf; }
-.dot.expansao { background: #22b305; }
-.dot.inicio { background: #f5f104; }
-.dot.declinio { background: #8e0000; }
-
-
-/* Responsivo */
-@media (max-width: 900px) {
+/* Responsividade para celular */
+@media (max-width: 600px) {
   .risco-page {
     flex-direction: column;
+    padding: 12px;
   }
 
   .sidebar {
     width: 100%;
+    min-width: unset;
+    height: auto;
   }
+
+  .risk-indicators {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .indicator-card {
+    width: 100%;
+  }
+
+  .dashboard-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .card.chart-card svg {
+    width: 100%;
+    height: auto;
+  }
+
+  .empresa-detalhes {
+    width: 100%;
+    padding: 10px;
+  }
+
+  .main-content h1 {
+    font-size: 1.4rem;
+  }
+
+  .main-content h2 {
+    font-size: 1rem;
+  }
+
+  .map-card div {
+    width: 100px;       /* ocupa 90% da tela, deixando margem */
+    height: 100px;    /* altura menor para celular */
+    margin: 0 auto;   /* centraliza o mapa */
+  }
+
+  .map-card svg {
+    width: 200;
+    height: 200;
+ }
+
 }
-
-
