@@ -1,3 +1,5 @@
+@import url('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+
 /* Reset básico */
 * {
   margin: 0;
@@ -142,6 +144,20 @@
   gap: 16px;
 }
 
+.network-card {
+  margin-top: 20px;
+  padding: 16px;
+  background: var(--card-bg);
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.network-card h2 {
+  margin-bottom: 12px;
+  color: var(--accent);
+}
+
+
 /* Responsividade para celular */
 @media (max-width: 600px) {
   .risco-page {
@@ -189,10 +205,11 @@
   }
 
   .map-card div {
-    width: 100px;       /* ocupa 90% da tela, deixando margem */
-    height: 100px;    /* altura menor para celular */
-    margin: 0 auto;   /* centraliza o mapa */
-  }
+  width: 100%;
+  height: 400px;  /* já tinha */
+  position: relative;
+  overflow: visible;
+}
 
   .map-card svg {
     width: 200;

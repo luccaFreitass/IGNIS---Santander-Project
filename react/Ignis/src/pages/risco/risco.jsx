@@ -24,17 +24,16 @@ function Risco() {
   const [ml2Dados, setMl2Dados] = useState({});
   const [loading, setLoading] = useState(false);
   const [fraudeMessage, setFraudeMessage] = useState("");
-
-  const barRef = useRef();
-  const gaugeRef = useRef();
-  const radarRef = useRef();
   const mapRef = useRef();
+  const networkRef = useRef();
 
+  // Redireciona se não for usuário de risco
   useEffect(() => {
     const userType = sessionStorage.getItem("userType");
     if (userType !== "risco") navigate("/");
   }, [navigate]);
 
+  // Função para buscar perfil pelo CNPJ
   const buscarPerfil = async (cnpj) => {
     setLoading(true);
     try {
@@ -46,9 +45,6 @@ function Risco() {
 
       if (!response.ok) throw new Error(`Erro na API: ${response.status}`);
       const data = await response.json();
-
-      console.log("[DEBUG] ML1:", data.ML1);
-      console.log("[DEBUG] ML2:", data.ML2);
 
       setEmpresaDados({
         CNPJ: data.ID || "-",
@@ -66,12 +62,11 @@ function Risco() {
       setMl2Dados(data.ML2 || {});
       setPerfil(data.ML1?.perfil_predito || "-");
 
-      // Mostrar alerta de fraude se houver
-      if (data.ML1?.alertas && data.ML1.alertas !== "nan") {
-        setFraudeMessage(data.ML1.alertas);
-      } else {
-        setFraudeMessage("");
-      }
+      setFraudeMessage(
+        data.ML1?.alertas && data.ML1.alertas !== "nan"
+          ? data.ML1.alertas
+          : ""
+      );
 
     } catch (err) {
       console.error(err);
@@ -96,127 +91,144 @@ function Risco() {
     }
   };
 
-  const getDotClass = (perfil) => {
-    if (!perfil) return "";
-    switch (perfil.toLowerCase()) {
-      case "madura": return "madura";
-      case "expansao": return "expansao";
-      case "inicio": return "inicio";
-      case "declinio": return "declinio";
-      default: return "";
+// Gráfico de rede (rede de parceiros)
+useEffect(() => {
+  if (!ml2Dados.principais_parceiros || ml2Dados.principais_parceiros.length === 0) return;
+
+  const width = 500;
+  const height = 400;
+  d3.select(networkRef.current).selectAll("*").remove();
+
+  const svg = d3.select(networkRef.current)
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height)
+                .style("background", "rgba(30,30,30,0)")
+                .style("border-radius", "12px");
+
+  // Tooltip
+  const tooltip = d3.select(networkRef.current)
+    .append("div")
+    .style("position", "absolute")
+    .style("padding", "6px 10px")
+    .style("background", "rgba(0,0,0,0.7)")
+    .style("color", "#fff")
+    .style("border-radius", "6px")
+    .style("pointer-events", "none")
+    .style("opacity", 0);
+
+  const nodes = [
+    { id: empresaDados.CNPJ, central: true },
+    ...ml2Dados.principais_parceiros.map(p => ({
+      id: p.cnpj,
+      peso: p.peso,
+      classificacao: p.classificacao // "Crítico", "Importante" ou "Secundário"
+    }))
+  ];
+
+  const links = ml2Dados.principais_parceiros.map(p => ({
+    source: empresaDados.CNPJ,
+    target: p.cnpj,
+    weight: p.peso
+  }));
+
+  const simulation = d3.forceSimulation(nodes)
+    .force("link", d3.forceLink(links).id(d => d.id).distance(90))
+    .force("charge", d3.forceManyBody().strength(-250))
+    .force("center", d3.forceCenter(width / 2, height / 2));
+
+  const link = svg.append("g")
+    .attr("stroke", "#b957577a")
+    .selectAll("line")
+    .data(links)
+    .join("line")
+    .attr("stroke-width", d => Math.sqrt(d.weight) / 5)
+    .attr("opacity", 0.7);
+
+  const node = svg.append("g")
+    .selectAll("circle")
+    .data(nodes)
+    .join("circle")
+    .attr("r", d => d.central ? 16 : 10)
+    .attr("fill", d => {
+      if (d.central) return "#2cc4c9ff";
+      if (d.classificacao === "Crítico") return "#ff4d4d";     // vermelho forte
+      if (d.classificacao === "Importante") return "#ffae42";  // laranja
+      if (d.classificacao === "Secundário") return "#4caf50";  // verde
+      return "#999";
+    })
+    .attr("stroke", "#fff")
+    .attr("stroke-width", 1.5)
+    .call(drag(simulation))
+    .on("mouseover", (event, d) => {
+      tooltip.transition().duration(200).style("opacity", 1);
+      tooltip.html(`<strong>${d.id}</strong><br>Peso: ${d.peso || "-"}<br>Classificação: ${d.classificacao || "-"}`)
+             .style("left", event.pageX + 10 + "px")
+             .style("top", event.pageY + 10 + "px");
+    })
+    .on("mouseout", () => tooltip.transition().duration(200).style("opacity", 0));
+
+  const label = svg.append("g")
+    .selectAll("text")
+    .data(nodes)
+    .join("text")
+    .text(d => d.id)
+    .attr("font-size", "10px")
+    .attr("fill", "#fff")
+    .attr("text-anchor", "middle")
+    .attr("dy", -16);
+
+  simulation.on("tick", () => {
+    link
+      .attr("x1", d => d.source.x)
+      .attr("y1", d => d.source.y)
+      .attr("x2", d => d.target.x)
+      .attr("y2", d => d.target.y);
+
+    node
+      .attr("cx", d => d.x)
+      .attr("cy", d => d.y);
+
+    label
+      .attr("x", d => d.x)
+      .attr("y", d => d.y);
+  });
+
+  function drag(simulation) {
+    function dragstarted(event, d) {
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      d.fx = d.x;
+      d.fy = d.y;
     }
-  };
+    function dragged(event, d) {
+      d.fx = event.x;
+      d.fy = event.y;
+    }
+    function dragended(event, d) {
+      if (!event.active) simulation.alphaTarget(0);
+      d.fx = null;
+      d.fy = null;
+    }
+    return d3.drag()
+      .on("start", dragstarted)
+      .on("drag", dragged)
+      .on("end", dragended);
+  }
+}, [ml2Dados, empresaDados.CNPJ]);
 
-  // --------- Gráficos D3 ---------
-  useEffect(() => {
-    if (!empresaDados.VL_CAR) return;
 
-    // Barra VL_CAR vs VL_PDD
-    const barData = [
-      { name: "VL_CAR", value: empresaDados.VL_CAR },
-      { name: "VL_PDD", value: empresaDados.VL_PDD }
-    ];
-
-    d3.select(barRef.current).selectAll("*").remove();
-    const width = 250, height = 150;
-    const svg = d3.select(barRef.current).append("svg").attr("width", width).attr("height", height);
-
-    const x = d3.scaleBand().domain(barData.map(d => d.name)).range([0, width]).padding(0.4);
-    const y = d3.scaleLinear().domain([0, d3.max(barData, d => d.value)*1.2]).range([height-20, 0]);
-
-    svg.selectAll(".bar")
-       .data(barData)
-       .enter()
-       .append("rect")
-       .attr("class", "bar")
-       .attr("x", d => x(d.name))
-       .attr("y", d => y(d.value))
-       .attr("width", x.bandwidth())
-       .attr("height", d => height-20 - y(d.value))
-       .attr("fill", d => d.name === "VL_PDD" ? "#c9302c" : "#337ab7");
-
-    svg.selectAll(".label")
-       .data(barData)
-       .enter()
-       .append("text")
-       .text(d => d.value.toLocaleString())
-       .attr("x", d => x(d.name) + x.bandwidth()/2)
-       .attr("y", d => y(d.value)-5)
-       .attr("text-anchor", "middle")
-       .attr("font-size", "12px");
-
-    // Gauge Percentual PDD
-    const percent = parseFloat(empresaDados.Percentual_PDD.toString().replace("%","")) || 0;
-    d3.select(gaugeRef.current).selectAll("*").remove();
-    const gWidth = 250, gHeight = 150;
-    const gSvg = d3.select(gaugeRef.current).append("svg").attr("width", gWidth).attr("height", gHeight);
-
-    const arc = d3.arc()
-                  .innerRadius(40)
-                  .outerRadius(70)
-                  .startAngle(-Math.PI/2)
-                  .endAngle(-Math.PI/2 + (Math.PI * percent/50));
-
-    gSvg.append("path")
-        .attr("d", arc)
-        .attr("fill", percent > 10 ? "#c9302c" : "#5cb85c")
-        .attr("transform", `translate(${gWidth/2},${gHeight-20})`);
-
-    gSvg.append("text")
-        .attr("x", gWidth/2)
-        .attr("y", gHeight/2 + 20)
-        .attr("text-anchor", "middle")
-        .attr("font-size", "16px")
-        .text(`${percent}% PDD`);
-
-    // Radar simples
-    const radarData = [
-      { axis: "Score", value: empresaDados.Score_cliente ? empresaDados.Score_cliente/1000 : 0.7 },
-      { axis: "Risco", value: empresaDados.Faixa_risco === "Alto" ? 1 : empresaDados.Faixa_risco === "Medio" ? 0.6 : 0.3 },
-      { axis: "PDD", value: percent/100 }
-    ];
-
-    const radarSize = 120;
-    const radarSvg = d3.select(radarRef.current);
-    radarSvg.selectAll("*").remove();
-    const radarG = radarSvg.append("g").attr("transform", `translate(${radarSize},${radarSize})`);
-    const angles = radarData.map((d,i) => (i/(radarData.length)) * 2*Math.PI - Math.PI/2);
-
-    radarG.selectAll(".radar-line")
-          .data(radarData)
-          .enter()
-          .append("line")
-          .attr("x1", 0)
-          .attr("y1", 0)
-          .attr("x2", (d,i) => radarSize*d.value*Math.cos(angles[i]))
-          .attr("y2", (d,i) => radarSize*d.value*Math.sin(angles[i]))
-          .attr("stroke", "#337ab7")
-          .attr("stroke-width", 2);
-
-    radarG.selectAll(".radar-label")
-          .data(radarData)
-          .enter()
-          .append("text")
-          .text(d => d.axis)
-          .attr("x", (d,i) => radarSize*1.1*Math.cos(angles[i]))
-          .attr("y", (d,i) => radarSize*1.1*Math.sin(angles[i]))
-          .attr("text-anchor", "middle")
-          .attr("font-size", "10px");
-
-  }, [empresaDados]);
-
-  // Mapa do Brasil
+  // Mapa destacando o estado
   useEffect(() => {
     if (!empresaDados.Estado) return;
 
-    const geoUrl =
-      "https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson";
+    const geoUrl = "https://raw.githubusercontent.com/codeforamerica/click_that_hood/master/public/data/brazil-states.geojson";
 
     d3.json(geoUrl).then(geoData => {
       d3.select(mapRef.current).selectAll("*").remove();
 
       const width = 500;
       const height = 400;
+
       const svg = d3.select(mapRef.current)
                     .append("svg")
                     .attr("width", width)
@@ -225,38 +237,41 @@ function Risco() {
       const projection = d3.geoMercator().fitSize([width, height], geoData);
       const path = d3.geoPath().projection(projection);
 
+      // Todos os estados
       svg.selectAll("path")
-         .data(geoData.features)
-         .enter()
-         .append("path")
-         .attr("d", path)
-         .attr("fill", "transparent")
-         .attr("stroke", "#c9302c")
-         .attr("stroke-width", 1.5);
+        .data(geoData.features)
+        .enter()
+        .append("path")
+        .attr("d", path)
+        .attr("fill", "transparent")
+        .attr("stroke", "#c9302c")
+        .attr("stroke-width", 1.5);
 
+      // Destaca o estado
       const estadoDest = geoData.features.find(f => f.properties.sigla === empresaDados.Estado);
       if (estadoDest) {
         svg.append("path")
-           .datum(estadoDest)
-           .attr("d", path)
-           .attr("fill", "#c9302c")
-           .attr("stroke", "#c9302c")
-           .attr("stroke-width", 2);
+          .datum(estadoDest)
+          .attr("d", path)
+          .attr("fill", "#c9302c")
+          .attr("stroke", "#c9302c")
+          .attr("stroke-width", 2);
 
         const [x, y] = path.centroid(estadoDest);
         svg.append("text")
-           .attr("x", x)
-           .attr("y", y)
-           .text(empresaDados.Estado)
-           .attr("text-anchor", "middle")
-           .attr("alignment-baseline", "middle")
-           .attr("fill", "#fff")
-           .attr("font-size", "14px")
-           .attr("font-weight", "bold");
+          .attr("x", x)
+          .attr("y", y)
+          .text(empresaDados.Estado)
+          .attr("text-anchor", "middle")
+          .attr("alignment-baseline", "middle")
+          .attr("fill", "#fff")
+          .attr("font-size", "14px")
+          .attr("font-weight", "bold");
       }
     }).catch(err => console.error("Erro carregando GeoJSON:", err));
   }, [empresaDados.Estado]);
 
+  // JSX
   return (
     <div className="risco-page">
       <aside className="sidebar">
@@ -296,18 +311,16 @@ function Risco() {
           </div>
         </div>
 
-        <div className="dashboard-grid">
-          <div className="card chart-card">
-            <h2>Gráficos</h2>
-            <div ref={barRef}></div>
-            <div ref={gaugeRef} style={{ marginTop: "20px" }}></div>
-            <svg ref={radarRef} width={250} height={250} style={{ marginTop: "20px" }}></svg>
+        {ml2Dados && ml2Dados.principais_parceiros && (
+          <div className="card network-card">
+            <h2>Rede de Parceiros</h2>
+            <div ref={networkRef} style={{ width: "100%", height: "400px", position: "relative" }}></div>
           </div>
+        )}
 
-          <div className="card map-card">
-            <h2>Localização da Empresa</h2>
-            <div style={{ width: "100%", height: "400px" }} ref={mapRef}></div>
-          </div>
+        <div className="card map-card">
+          <h2>Localização da Empresa</h2>
+          <div ref={mapRef} style={{ width: "100%", height: "400px", position: "relative", overflow: "visible" }}></div>
         </div>
       </main>
 

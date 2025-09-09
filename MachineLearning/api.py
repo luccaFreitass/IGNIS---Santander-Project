@@ -13,8 +13,7 @@ import numpy as np
 def normalizar(s):
     if pd.isna(s):
         return ""
-    s = str(s).upper()
-    return s
+    return str(s).upper()
 
 def calcular_pdd(vl_car, percentual):
     if pd.isna(vl_car) or pd.isna(percentual):
@@ -64,16 +63,13 @@ def carregar_dados():
     df['DS_CNAE'] = df['DS_CNAE'].astype(str).apply(normalizar)
     df['IDADE_EMPRESA'] = (datetime.now() - pd.to_datetime(df['DT_ABRT'])).dt.days / 365
 
-    # Criar dicionário DS_CNAE -> código
     unique_cnae = df['DS_CNAE'].unique()
     ds_cnae_map = {cnae: idx for idx, cnae in enumerate(unique_cnae)}
     df['DS_CNAE_CODE'] = df['DS_CNAE'].map(ds_cnae_map)
 
-    # Escalar colunas numéricas
     scaler = StandardScaler()
     df[num_cols] = scaler.fit_transform(df[num_cols])
 
-    # Treinar ML1
     X = df[['VL_FATU', 'VL_SLDO', 'IDADE_EMPRESA', 'DS_CNAE_CODE']]
     y = df[target_col]
     ml1_model = RandomForestClassifier(n_estimators=200, random_state=42)
@@ -96,17 +92,35 @@ def carregar_dados():
 
 carregar_dados()
 
-# ===== Analisar rede ML2 =====
+# ===== Classificação unitária de parceiros =====
+def classificar_parceiro(peso, total_volume):
+    if total_volume == 0:
+        return "Não classificado"
+    rel = peso / total_volume
+    if rel >= 0.5:
+        return "Crítico"
+    elif rel >= 0.2:
+        return "Importante"
+    else:
+        return "Secundário"
+
+# ===== Analisar rede ML2 adaptada =====
 def analisar_rede(cnpj):
     cnpj = cnpj.strip().upper()
     if cnpj not in G.nodes:
-        return {"parceiros_totais": 0, "volume_total": 0, "principais_parceiros": [], "centralidade": None, "risco_rede": "Não encontrado"}
+        return {"parceiros_totais": 0, "volume_total": 0, "principais_parceiros": [], 
+                "centralidade": None, "risco_rede": "Não encontrado"}
 
     parceiros = list(G.successors(cnpj)) + list(G.predecessors(cnpj))
     volume_total = sum([d["weight"] for _, _, d in G.edges(cnpj, data=True)])
 
-    parceiros_valores = [{"cnpj": t, "peso": float(d["weight"])} for _, t, d in G.out_edges(cnpj, data=True)]
-    parceiros_valores = sorted(parceiros_valores, key=lambda x: x["peso"], reverse=True)[:3]
+    parceiros_valores = []
+    for _, t, d in G.out_edges(cnpj, data=True):
+        peso = float(d["weight"])
+        classificacao = classificar_parceiro(peso, volume_total)
+        parceiros_valores.append({"cnpj": t, "peso": peso, "classificacao": classificacao})
+
+    parceiros_valores = sorted(parceiros_valores, key=lambda x: x["peso"], reverse=True)
 
     centralidade = {
         "grau": float(grau_centralidade.get(cnpj, 0)),
@@ -120,11 +134,15 @@ def analisar_rede(cnpj):
     elif centralidade["grau"] < 0.05:
         risco = "Médio"
 
-    # Debug ML2
     print("[ML2 DEBUG]", cnpj, parceiros, volume_total, parceiros_valores, centralidade, risco)
 
-    return {"parceiros_totais": len(set(parceiros)), "volume_total": float(volume_total),
-            "principais_parceiros": parceiros_valores, "centralidade": centralidade, "risco_rede": risco}
+    return {
+        "parceiros_totais": len(set(parceiros)),
+        "volume_total": float(volume_total),
+        "principais_parceiros": parceiros_valores,
+        "centralidade": centralidade,
+        "risco_rede": risco
+    }
 
 # ===== Inicializar API =====
 app = FastAPI(title="API de Predição de Empresa", version="2.0.0")
@@ -143,7 +161,7 @@ async def predict(data: IDRequest):
     id_input = data.id.strip().upper()
     print(f"[INFO] CNPJ recebido: {id_input}")
 
-    # ML1
+    # --- ML1 ---
     empresa = df[df["ID"] == id_input]
     ml1_result = {}
     if not empresa.empty:
@@ -171,10 +189,9 @@ async def predict(data: IDRequest):
             "Estado": str(estado)
         }
 
-        # Debug ML1
         print("[ML1 DEBUG]", X_input, ml1_result)
 
-    # ML2
+    # --- ML2 ---
     ml2_result = analisar_rede(id_input)
 
     return {"ID": id_input, "ML1": ml1_result, "ML2": ml2_result}
