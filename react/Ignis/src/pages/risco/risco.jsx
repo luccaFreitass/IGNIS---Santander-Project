@@ -21,6 +21,7 @@ function Risco() {
     VL_PDD: 0,
     Estado: ""
   });
+  const [ml2Dados, setMl2Dados] = useState({});
   const [loading, setLoading] = useState(false);
   const [fraudeMessage, setFraudeMessage] = useState("");
 
@@ -40,26 +41,38 @@ function Risco() {
       const response = await fetch("http://localhost:8000/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: cnpj.trim() }),
+        body: JSON.stringify({ id: cnpj.trim().toUpperCase() }),
       });
 
       if (!response.ok) throw new Error(`Erro na API: ${response.status}`);
       const data = await response.json();
 
+      console.log("[DEBUG] ML1:", data.ML1);
+      console.log("[DEBUG] ML2:", data.ML2);
+
       setEmpresaDados({
         CNPJ: data.ID || "-",
-        razaoSocial: data.razaoSocial || "-",
-        setor: data.setor || "-",
-        alertas: data.alertas || "",
-        VL_CAR: data.VL_CAR || 0,
-        Score_cliente: data.Score_cliente || null,
-        Faixa_risco: data.Faixa_risco || "",
-        Percentual_PDD: data.Percentual_PDD || "0%",
-        VL_PDD: data.VL_PDD || 0,
-        Estado: data.Estado || ""
+        razaoSocial: data.ML1?.razaoSocial || "Empresa Fictícia",
+        setor: data.ML1?.setor || "-",
+        alertas: data.ML1?.alertas || "Nenhuma fraude detectada",
+        VL_CAR: data.ML1?.VL_CAR || 0,
+        Score_cliente: data.ML1?.Score_cliente || null,
+        Faixa_risco: data.ML1?.Faixa_risco || "-",
+        Percentual_PDD: data.ML1?.Percentual_PDD || "0%",
+        VL_PDD: data.ML1?.VL_PDD || 0,
+        Estado: data.ML1?.Estado || ""
       });
 
-      setPerfil(data.perfil_predito || "-");
+      setMl2Dados(data.ML2 || {});
+      setPerfil(data.ML1?.perfil_predito || "-");
+
+      // Mostrar alerta de fraude se houver
+      if (data.ML1?.alertas && data.ML1.alertas !== "nan") {
+        setFraudeMessage(data.ML1.alertas);
+      } else {
+        setFraudeMessage("");
+      }
+
     } catch (err) {
       console.error(err);
       setEmpresaDados({
@@ -74,17 +87,14 @@ function Risco() {
         VL_PDD: 0,
         Estado: ""
       });
+      setMl2Dados({});
       setPerfil("");
+      setFraudeMessage("");
       alert("Erro ao consultar API.");
     } finally {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (empresaDados.alertas && empresaDados.alertas.trim() !== "" && empresaDados.alertas !== "Nenhuma fraude detectada")
-      setFraudeMessage(empresaDados.alertas);
-  }, [empresaDados.alertas]);
 
   const getDotClass = (perfil) => {
     if (!perfil) return "";
@@ -101,7 +111,7 @@ function Risco() {
   useEffect(() => {
     if (!empresaDados.VL_CAR) return;
 
-    // 1️⃣ Barra VL_CAR vs VL_PDD
+    // Barra VL_CAR vs VL_PDD
     const barData = [
       { name: "VL_CAR", value: empresaDados.VL_CAR },
       { name: "VL_PDD", value: empresaDados.VL_PDD }
@@ -135,7 +145,7 @@ function Risco() {
        .attr("text-anchor", "middle")
        .attr("font-size", "12px");
 
-    // 2️⃣ Gauge Percentual PDD
+    // Gauge Percentual PDD
     const percent = parseFloat(empresaDados.Percentual_PDD.toString().replace("%","")) || 0;
     d3.select(gaugeRef.current).selectAll("*").remove();
     const gWidth = 250, gHeight = 150;
@@ -159,7 +169,7 @@ function Risco() {
         .attr("font-size", "16px")
         .text(`${percent}% PDD`);
 
-    // 3️⃣ Radar simples
+    // Radar simples
     const radarData = [
       { axis: "Score", value: empresaDados.Score_cliente ? empresaDados.Score_cliente/1000 : 0.7 },
       { axis: "Risco", value: empresaDados.Faixa_risco === "Alto" ? 1 : empresaDados.Faixa_risco === "Medio" ? 0.6 : 0.3 },
@@ -169,7 +179,6 @@ function Risco() {
     const radarSize = 120;
     const radarSvg = d3.select(radarRef.current);
     radarSvg.selectAll("*").remove();
-
     const radarG = radarSvg.append("g").attr("transform", `translate(${radarSize},${radarSize})`);
     const angles = radarData.map((d,i) => (i/(radarData.length)) * 2*Math.PI - Math.PI/2);
 
@@ -193,9 +202,10 @@ function Risco() {
           .attr("y", (d,i) => radarSize*1.1*Math.sin(angles[i]))
           .attr("text-anchor", "middle")
           .attr("font-size", "10px");
+
   }, [empresaDados]);
 
-  // --------- Mapa do Brasil -------------
+  // Mapa do Brasil
   useEffect(() => {
     if (!empresaDados.Estado) return;
 
@@ -207,14 +217,12 @@ function Risco() {
 
       const width = 500;
       const height = 400;
-
       const svg = d3.select(mapRef.current)
                     .append("svg")
                     .attr("width", width)
                     .attr("height", height);
 
-      const projection = d3.geoMercator()
-                           .fitSize([width, height], geoData);
+      const projection = d3.geoMercator().fitSize([width, height], geoData);
       const path = d3.geoPath().projection(projection);
 
       svg.selectAll("path")
@@ -254,7 +262,6 @@ function Risco() {
       <aside className="sidebar">
         <CnpjWidget onResult={buscarPerfil} />
 
-        {/* Dados detalhados da empresa */}
         {empresaDados.CNPJ && (
           <div className="empresa-detalhes">
             <h3>Dados da Empresa</h3>
@@ -270,7 +277,6 @@ function Risco() {
         <h1 className="main-title">Análise de Risco</h1>
         {loading && <Loading message="Carregando dados..." />}
 
-        {/* Indicadores de risco */}
         <div className="risk-indicators">
           <div className="indicator-card">
             <h3>Valor em Aberto</h3>
@@ -290,7 +296,6 @@ function Risco() {
           </div>
         </div>
 
-        {/* Gráfico e mapa lado a lado */}
         <div className="dashboard-grid">
           <div className="card chart-card">
             <h2>Gráficos</h2>
