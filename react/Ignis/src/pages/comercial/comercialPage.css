@@ -1,23 +1,40 @@
+/* Reset básico */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  font-family: "InterVariable", Arial, sans-serif;
 }
 
+/* Paleta e variáveis globais */
+:root {
+  --accent: #dc2626;
+  --accent-hover: #b91c1c;
+  --accent-light: #fca5a5;
+  --card-bg: rgba(0, 0, 0, 0.6);
+  --card-border: rgba(255, 255, 255, 0.1);
+  --text-primary: #ffffff;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --sidebar-bg: rgba(0, 0, 0, 0.6);
+  --gradient-primary: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  --gradient-card: rgba(0, 0, 0, 0.7);
+  --shadow-card: 0 10px 25px rgba(0, 0, 0, 0.3);
+  --shadow-hover: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+
+/* Página */
 .comercial-page {
-  font-family: Arial, sans-serif;
   min-height: 100vh;
-  background-color: #000000;
-  position: relative;
   width: 100%;
-  height: 100vh;
-  background-image: url('./src/images/imagemLogin.png');
-  background-repeat: no-repeat;
+  background: #000 url('./src/images/imagemLogin.png') no-repeat center center fixed;
   background-size: cover;
-  background-position: center center;
-  background-attachment: fixed;
-  box-sizing: border-box;
-  padding: 0;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: 3vh 0;
+  color: var(--text-primary);
 }
 
 .comercial-page::before {
@@ -25,7 +42,7 @@
   position: fixed;
   inset: 0;
   z-index: -1;
-  background: radial-gradient(circle, rgba(0, 0, 0, 0) 10%, rgba(0, 0, 0, 0.9) 100%);
+  background: var(--gradient-bg);
   pointer-events: none;
 }
 
@@ -33,65 +50,116 @@
 .comercial-container {
   width: 85%;
   margin: auto;
-  min-height: 90vh;
+  min-height: 85vh;
   display: flex;
   flex-direction: column;
   padding: 2rem;
-  background-color: rgba(12, 12, 12, 0.4);
+  background: rgba(12, 12, 12, 0.5);
   backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
-  margin-top: 3vh;
+  border-radius: 16px;
+  box-shadow: var(--shadow-card);
+  transition: all 0.3s ease;
 }
 
 /* Título */
 .comercial-header {
   text-align: center;
-  color: white;
-  font-size: 2rem;
+  font-size: 2.2rem;
+  font-weight: 700;
   margin-bottom: 2rem;
+  background: linear-gradient(135deg, var(--accent), var(--accent-light));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 /* Cards */
 .comercial-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1.5rem;
+  gap: 1.8rem;
 }
 
 .comercial-card {
-  background: rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  border-radius: 10px;
-  padding: 1.5rem;
-  color: white;
-  transition: transform 0.2s ease;
+  background: var(--card-bg);
+  border-radius: 14px;
+  padding: 1.8rem;
+  color: var(--text-primary);
+  box-shadow: var(--shadow-card);
+  transition: all 0.3s ease;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.comercial-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.comercial-card:hover::before {
+  transform: scaleX(1);
 }
 
 .comercial-card:hover {
-  transform: translateY(-4px);
-  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-6px);
+  background: var(--card-hover);
+  box-shadow: var(--shadow-hover);
+  border-color: var(--accent);
 }
 
+/* Título do card */
 .comercial-title {
-  font-size: 1.2rem;
-  font-weight: bold;
+  font-size: 1.25rem;
+  font-weight: 600;
   margin-bottom: 1rem;
-  color: #ff4d4d;
+  color: var(--accent);
 }
 
+/* Texto do card */
 .comercial-text {
   font-size: 0.95rem;
-  line-height: 1.5rem;
-  color: #e5e5e5;
+  line-height: 1.6rem;
+  color: var(--text-secondary);
 }
 
-/* Responsivo */
+/* Responsividade */
+@media screen and (max-width: 1024px) {
+  .comercial-container {
+    width: 92%;
+    padding: 1.5rem;
+  }
+}
+
 @media screen and (max-width: 768px) {
   .comercial-container {
     width: 95%;
     padding: 1.2rem;
+  }
+
+  .comercial-header {
+    font-size: 1.8rem;
+  }
+
+  .comercial-cards {
+    gap: 1.2rem;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .comercial-container {
+    padding: 1rem;
+  }
+
+  .comercial-card {
+    padding: 1.2rem;
+  }
+
+  .comercial-title {
+    font-size: 1.1rem;
   }
 }
