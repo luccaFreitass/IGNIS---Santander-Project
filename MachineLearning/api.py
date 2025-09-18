@@ -67,11 +67,13 @@ def carregar_dados():
     ds_cnae_map = {cnae: idx for idx, cnae in enumerate(unique_cnae)}
     df['DS_CNAE_CODE'] = df['DS_CNAE'].map(ds_cnae_map)
 
+    # Escalonar apenas para treinar o modelo
     scaler = StandardScaler()
-    df[num_cols] = scaler.fit_transform(df[num_cols])
-
-    X = df[['VL_FATU', 'VL_SLDO', 'IDADE_EMPRESA', 'DS_CNAE_CODE']]
+    X_scaled = scaler.fit_transform(df[num_cols])
+    X = pd.DataFrame(X_scaled, columns=num_cols)
+    X['DS_CNAE_CODE'] = df['DS_CNAE_CODE']
     y = df[target_col]
+
     ml1_model = RandomForestClassifier(n_estimators=200, random_state=42)
     ml1_model.fit(X, y)
     print("[INFO] Modelo ML1 treinado.")
@@ -167,11 +169,15 @@ async def predict(data: IDRequest):
     if not empresa.empty:
         row = empresa.iloc[0]
         ds_cnae_code = ds_cnae_map.get(row['DS_CNAE'], -1)
-        X_input = [[row['VL_FATU'], row['VL_SLDO'], row['IDADE_EMPRESA'], ds_cnae_code]]
+
+        # Preparar input escalonado apenas para ML1
+        X_input = scaler.transform([[row['VL_FATU'], row['VL_SLDO'], row['IDADE_EMPRESA']]]) 
+        X_input = np.append(X_input, ds_cnae_code).reshape(1, -1)
         perfil_predito = ml1_model.predict(X_input)[0]
 
         alerta = row.get("PREV", "Nenhuma fraude detectada") or "Nenhuma fraude detectada"
         vl_car = row.get("VL_CAR", 0)
+        vl_sldo = row.get("VL_SLDO", 0)  # USAR VALOR ORIGINAL
         percentual_pdd = row.get("Percentual_PDD", "0%")
         vl_pdd = calcular_pdd(vl_car, percentual_pdd)
         estado = row.get("Estado", "")
@@ -182,6 +188,7 @@ async def predict(data: IDRequest):
             "perfil_predito": str(perfil_predito),
             "alertas": str(alerta),
             "VL_CAR": to_native(vl_car),
+            "VL_SLDO": to_native(vl_sldo),  # VALOR CORRETO
             "Score_cliente": to_native(row.get("Score_cliente", None)),
             "Faixa_risco": row.get("Faixa_risco", None),
             "Percentual_PDD": str(percentual_pdd),

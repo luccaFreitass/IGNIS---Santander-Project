@@ -75,6 +75,7 @@ function Risco() {
         setor: data.ML1?.setor || "-",
         alertas: data.ML1?.alertas || "Nenhuma fraude detectada",
         VL_CAR: data.ML1?.VL_CAR || 0,
+        VL_SLDO: data.ML1?.VL_SLDO || 0,
         Score_cliente: data.ML1?.Score_cliente || null,
         Faixa_risco: data.ML1?.Faixa_risco || "-",
         Percentual_PDD: data.ML1?.Percentual_PDD || "0%",
@@ -94,6 +95,7 @@ function Risco() {
         setor: "",
         alertas: "",
         VL_CAR: 0,
+        VL_SLDO: 0,
         Score_cliente: null,
         Faixa_risco: "",
         Percentual_PDD: "0%",
@@ -357,6 +359,10 @@ useEffect(() => {
               <strong>Setor:</strong> {empresaDados.setor}
             </p>
             <p>
+              <strong>Saldo em Conta:</strong> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(empresaDados.VL_SLDO)}
+
+            </p>
+            <p>
               <strong>Perfil:</strong> {perfil}
             </p>
           </div>
@@ -366,7 +372,6 @@ useEffect(() => {
       <main className="main-content">
         <h1 className="main-title">Dashboard de Risco</h1>
         {loading && <Loading message="Carregando dados..." />}
-
         <div className="risk-indicators">
           <div className="indicator-card animate-slide-up">
             <div className="indicator-icon">💰</div>
