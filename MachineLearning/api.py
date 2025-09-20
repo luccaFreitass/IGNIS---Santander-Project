@@ -6,6 +6,8 @@ import pandas as pd
 from datetime import datetime
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 import networkx as nx
 import numpy as np
 
@@ -45,6 +47,7 @@ target_col = 'Perfil_empresa'
 df = None
 df_ml2 = None
 ml1_model = None
+ml3_model = None
 scaler = None
 ds_cnae_map = {}
 G = None
@@ -54,10 +57,10 @@ closeness_centralidade = {}
 
 # ===== Carregar dados e preparar modelos =====
 def carregar_dados():
-    global df, df_ml2, ml1_model, scaler, ds_cnae_map
+    global df, df_ml2, ml1_model, ml3_model, scaler, ds_cnae_map
     global G, grau_centralidade, betweenness_centralidade, closeness_centralidade
 
-    # --- ML1 ---
+    # --- ML1 + ML3 no mesmo dataset ---
     df = pd.read_excel(ARQUIVO_DADOS, sheet_name="ML1", dtype={"ID": str})
     df["ID"] = df["ID"].astype(str).str.strip().str.upper()
     df['DS_CNAE'] = df['DS_CNAE'].astype(str).apply(normalizar)
@@ -67,18 +70,34 @@ def carregar_dados():
     ds_cnae_map = {cnae: idx for idx, cnae in enumerate(unique_cnae)}
     df['DS_CNAE_CODE'] = df['DS_CNAE'].map(ds_cnae_map)
 
-    # Escalonar apenas para treinar o modelo
+    # Escalonar
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(df[num_cols])
     X = pd.DataFrame(X_scaled, columns=num_cols)
     X['DS_CNAE_CODE'] = df['DS_CNAE_CODE']
-    y = df[target_col]
 
+    # ===== ML1 =====
+    y1 = df[target_col]
+    X_train, X_test, y_train, y_test = train_test_split(X, y1, test_size=0.2, random_state=42)
     ml1_model = RandomForestClassifier(n_estimators=200, random_state=42)
-    ml1_model.fit(X, y)
-    print("[INFO] Modelo ML1 treinado.")
+    ml1_model.fit(X_train, y_train)
+    y_pred = ml1_model.predict(X_test)
+    acc1 = accuracy_score(y_test, y_pred)
+    print(f"[INFO] Modelo ML1 treinado. Acurácia: {acc1:.2f}")
 
-    # --- ML2 ---
+    # ===== ML3 =====
+    if "Produto_recomendado" in df.columns:
+        y3 = df['Produto_recomendado']
+        Xp_train, Xp_test, yp_train, yp_test = train_test_split(X, y3, test_size=0.2, random_state=42)
+        ml3_model = RandomForestClassifier(n_estimators=200, random_state=42)
+        ml3_model.fit(Xp_train, yp_train)
+        yp_pred = ml3_model.predict(Xp_test)
+        acc3 = accuracy_score(yp_test, yp_pred)
+        print(f"[INFO] Modelo ML3 (Recomendação de Produtos) treinado. Acurácia: {acc3:.2f}")
+    else:
+        print("[WARN] Coluna Produto_recomendado não encontrada na aba ML1")
+
+    # ===== ML2 =====
     df_ml2 = pd.read_excel(ARQUIVO_DADOS, sheet_name="ML2")
     df_ml2["ID_PGTO"] = df_ml2["ID_PGTO"].astype(str).str.strip().str.upper()
     df_ml2["ID_RCBE"] = df_ml2["ID_RCBE"].astype(str).str.strip().str.upper()
@@ -136,8 +155,6 @@ def analisar_rede(cnpj):
     elif centralidade["grau"] < 0.05:
         risco = "Médio"
 
-    print("[ML2 DEBUG]", cnpj, parceiros, volume_total, parceiros_valores, centralidade, risco)
-
     return {
         "parceiros_totais": len(set(parceiros)),
         "volume_total": float(volume_total),
@@ -147,7 +164,7 @@ def analisar_rede(cnpj):
     }
 
 # ===== Inicializar API =====
-app = FastAPI(title="API de Predição de Empresa", version="2.0.0")
+app = FastAPI(title="API de Predição de Empresa", version="3.1.0")
 
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
@@ -163,24 +180,29 @@ async def predict(data: IDRequest):
     id_input = data.id.strip().upper()
     print(f"[INFO] CNPJ recebido: {id_input}")
 
-    # --- ML1 ---
     empresa = df[df["ID"] == id_input]
     ml1_result = {}
+    produto_recomendado = None
+
     if not empresa.empty:
         row = empresa.iloc[0]
         ds_cnae_code = ds_cnae_map.get(row['DS_CNAE'], -1)
 
-        # Preparar input escalonado apenas para ML1
+        # Input para ML1 e ML3
         X_input = scaler.transform([[row['VL_FATU'], row['VL_SLDO'], row['IDADE_EMPRESA']]]) 
         X_input = np.append(X_input, ds_cnae_code).reshape(1, -1)
         perfil_predito = ml1_model.predict(X_input)[0]
 
         alerta = row.get("PREV", "Nenhuma fraude detectada") or "Nenhuma fraude detectada"
         vl_car = row.get("VL_CAR", 0)
-        vl_sldo = row.get("VL_SLDO", 0)  # USAR VALOR ORIGINAL
+        vl_sldo = row.get("VL_SLDO", 0)
         percentual_pdd = row.get("Percentual_PDD", "0%")
         vl_pdd = calcular_pdd(vl_car, percentual_pdd)
         estado = row.get("Estado", "")
+
+        # Predição de produto
+        if ml3_model:
+            produto_recomendado = ml3_model.predict(X_input)[0]
 
         ml1_result = {
             "razaoSocial": "Empresa Fictícia",
@@ -188,17 +210,15 @@ async def predict(data: IDRequest):
             "perfil_predito": str(perfil_predito),
             "alertas": str(alerta),
             "VL_CAR": to_native(vl_car),
-            "VL_SLDO": to_native(vl_sldo),  # VALOR CORRETO
+            "VL_SLDO": to_native(vl_sldo),
             "Score_cliente": to_native(row.get("Score_cliente", None)),
             "Faixa_risco": row.get("Faixa_risco", None),
             "Percentual_PDD": str(percentual_pdd),
             "VL_PDD": to_native(vl_pdd),
-            "Estado": str(estado)
+            "Estado": str(estado),
+            "Produto_recomendado": str(produto_recomendado) if produto_recomendado else "Não disponível"
         }
 
-        print("[ML1 DEBUG]", X_input, ml1_result)
-
-    # --- ML2 ---
     ml2_result = analisar_rede(id_input)
 
     return {"ID": id_input, "ML1": ml1_result, "ML2": ml2_result}

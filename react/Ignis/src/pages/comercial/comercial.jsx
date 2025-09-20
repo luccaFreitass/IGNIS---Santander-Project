@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom"
 import * as d3 from "d3"
 import CnpjWidget from "../consultaCnpj/cnpjWidget.jsx"
 import Loading from "../loading/loading.jsx"
+import ModalFraude from "../modalFraude/modalFraude.jsx"
 import "./comercialPage.css"
 
 function Comercial() {
@@ -17,10 +18,12 @@ function Comercial() {
     Estado: "",
     razaoSocial: "-",
     setor: "-",
-    perfil: "-", // se quiser, ou pode gerar dinamicamente depois
+    perfil: "-",
+    produto_recomendado: ""
   })
   const [loading, setLoading] = useState(false)
   const [insights, setInsights] = useState("")
+  const [fraudeMessage, setFraudeMessage] = useState("") // Estado do modalFraude
   const mapRef = useRef()
 
   // Redireciona se não for usuário comercial
@@ -50,24 +53,37 @@ function Comercial() {
         Estado: data.ML1?.Estado || "",
         razaoSocial: data.ML1?.razaoSocial || "-",
         setor: data.ML1?.setor || "-",
-        perfil: data.ML1?.perfil_predito || "-", // se quiser mostrar
+        perfil: data.ML1?.perfil_predito || "-",
+        produto_recomendado: data.ML1?.Produto_recomendado || "-"
       })
 
-      // Aqui você pode gerar insights com base nos dados
+      // Gerar insights com base nos dados
       setInsights(
         `Empresa com risco ${data.ML1?.Faixa_risco || "-"} e valor em aberto de R$ ${(
           data.ML1?.VL_CAR || 0
         ).toLocaleString("pt-BR")}.`,
       )
+
+      // Atualizar mensagem do modalFraude
+      setFraudeMessage(
+        data.ML1?.alertas && data.ML1.alertas !== "nan" ? data.ML1.alertas : ""
+      )
+
     } catch (err) {
       console.error(err)
       setEmpresaDados({
         CNPJ: "",
         VL_CAR: 0,
+        VL_SLDO: 0,
         Faixa_risco: "",
         Estado: "",
+        razaoSocial: "-",
+        setor: "-",
+        perfil: "-",
+        produto_recomendado: ""
       })
       setInsights("")
+      setFraudeMessage("")
       alert("Erro ao consultar API.")
     } finally {
       setLoading(false)
@@ -173,18 +189,18 @@ function Comercial() {
           <section className="metrics-section">
             <div className="metrics-grid">
               <div className="metric-card saldo-card">
-    <div className="metric-icon">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="2" y="6" width="20" height="12" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
-        <line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth="2"/>
-        <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
-      </svg>
-    </div>
-    <div className="metric-content">
-      <h3 className="metric-label">Saldo em Conta</h3>
-      <p className="metric-value">R$ {empresaDados.VL_SLDO.toLocaleString("pt-BR")}</p>
-    </div>
-  </div>
+                <div className="metric-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="2" y="6" width="20" height="12" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
+                    <line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth="2"/>
+                    <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
+                  </svg>
+                </div>
+                <div className="metric-content">
+                  <h3 className="metric-label">Saldo em Conta</h3>
+                  <p className="metric-value">R$ {empresaDados.VL_SLDO.toLocaleString("pt-BR")}</p>
+                </div>
+              </div>
 
               <div className="metric-card value-card">
                 <div className="metric-icon">
@@ -258,6 +274,13 @@ function Comercial() {
             </div>
           </section>
 
+          <div className="product_recomend-card">
+            <h2>Produto Recomendado</h2>
+            <div className="recommendations-content">
+              <p><strong>{empresaDados.produto_recomendado}</strong></p>
+            </div>
+          </div>
+
           <section className="visualization-section">
             <div className="chart-card">
               <div className="chart-header">
@@ -296,6 +319,9 @@ function Comercial() {
           </section>
         </main>
       </div>
+
+      {/* ModalFraude */}
+      <ModalFraude message={fraudeMessage} onClose={() => setFraudeMessage("")} />
     </div>
   )
 }
