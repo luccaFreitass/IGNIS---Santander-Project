@@ -114,10 +114,23 @@ function Risco() {
     }
   }
 
+  // Funções auxiliares de formatação
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(value || 0);
+  };
+
+  const formatPercent = (value) => {
+    return `${value?.toFixed(2) || '0.00'}%`;
+  };
+
   // ---------------------- Dados para gráficos ----------------------
   const parceirosData = (ml2Dados.principais_parceiros || []).map((p) => ({
     name: p.cnpj,
     peso: p.peso,
+    percentual: p.percentual,
     classificacao: p.classificacao,
   }))
 
@@ -149,23 +162,29 @@ function Risco() {
   const COLORS = ["#dc2626", "#f97316", "#22c55e", "#3b82f6"]
   const GRADIENT_COLORS = ["#dc2626", "#b91c1c", "#991b1b"]
 
-  const CustomTooltip = ({ active, payload, label }) => {
+  // Tooltip personalizada para os gráficos de barras
+  const CustomBarTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
+      const data = payload[0].payload;
       return (
         <div className="custom-tooltip">
-          <p className="tooltip-label">{`${label}`}</p>
-          {payload.map((entry, index) => (
-            <p key={index} className="tooltip-value" style={{ color: entry.color }}>
-              {`${entry.name}: ${entry.value}`}
-            </p>
-          ))}
+          <p className="tooltip-label">{`CNPJ: ...${label?.slice(-4) || ''}`}</p>
+          <p className="tooltip-value" style={{ color: payload[0].color }}>
+            {`Valor: ${formatCurrency(data.peso)}`}
+          </p>
+          <p className="tooltip-percent">
+            {`Percentual: ${formatPercent(data.percentual)}`}
+          </p>
+          <p className="tooltip-classification">
+            {`Classificação: ${data.classificacao}`}
+          </p>
         </div>
-      )
+      );
     }
-    return null
-  }
+    return null;
+  };
 
-  // NOVA TOOLTIP PERSONALIZADA PARA O GRÁFICO DE PIZZA
+  // Tooltip personalizada para o gráfico de pizza
   const CustomPieTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const classificacao = payload[0].name;
@@ -197,129 +216,129 @@ function Risco() {
     return null;
   };
 
-// ---------------------- D3: Rede de parceiros ----------------------
-useEffect(() => {
-  if (!ml2Dados.principais_parceiros || ml2Dados.principais_parceiros.length === 0) return;
+  // ---------------------- D3: Rede de parceiros ----------------------
+  useEffect(() => {
+    if (!ml2Dados.principais_parceiros || ml2Dados.principais_parceiros.length === 0) return;
 
-  const width = 360;
-  const height = 260;
-  d3.select(networkRef.current).selectAll("*").remove();
+    const width = 360;
+    const height = 260;
+    d3.select(networkRef.current).selectAll("*").remove();
 
-  const svg = d3.select(networkRef.current)
-    .append("svg")
-    .attr("width", width)
-    .attr("height", height);
+    const svg = d3.select(networkRef.current)
+      .append("svg")
+      .attr("width", width)
+      .attr("height", height);
 
-  // ===== NODES =====
-  const nodes = [
-    { id: empresaDados.CNPJ, central: true },
-    ...ml2Dados.principais_parceiros.map(p => ({
-      id: p.cnpj,
-      peso: p.peso,
-      classificacao: p.classificacao
-    }))
-  ];
+    // ===== NODES =====
+    const nodes = [
+      { id: empresaDados.CNPJ, central: true },
+      ...ml2Dados.principais_parceiros.map(p => ({
+        id: p.cnpj,
+        peso: p.peso,
+        classificacao: p.classificacao
+      }))
+    ];
 
-  // ===== LINKS =====
-  const links = ml2Dados.principais_parceiros.map(p => ({
-    source: empresaDados.CNPJ,
-    target: p.cnpj,
-    weight: p.peso
-  }));
+    // ===== LINKS =====
+    const links = ml2Dados.principais_parceiros.map(p => ({
+      source: empresaDados.CNPJ,
+      target: p.cnpj,
+      weight: p.peso
+    }));
 
-  // Garantir que links tenham objetos como source/target
-  links.forEach(l => {
-    if (typeof l.source === "string") {
-      l.source = nodes.find(n => n.id === l.source);
+    // Garantir que links tenham objetos como source/target
+    links.forEach(l => {
+      if (typeof l.source === "string") {
+        l.source = nodes.find(n => n.id === l.source);
+      }
+      if (typeof l.target === "string") {
+        l.target = nodes.find(n => n.id === l.target);
+      }
+    });
+
+    // ===== SIMULAÇÃO =====
+    const simulation = d3.forceSimulation(nodes)
+      .force("link", d3.forceLink(links).id(d => d.id).distance(90))
+      .force("charge", d3.forceManyBody().strength(-220))
+      .force("center", d3.forceCenter(width / 2, height / 2))
+      .force("collision", d3.forceCollide().radius(d => d.central ? 26 : 18));
+
+    // ===== LINKS =====
+    const link = svg.append("g")
+      .attr("stroke", "#b95757")
+      .attr("stroke-opacity", 0.7)
+      .selectAll("line")
+      .data(links)
+      .join("line")
+      .attr("stroke-width", d => Math.max(0.5, d.weight / 1000));
+
+    // ===== NODES =====
+    const node = svg.append("g")
+      .selectAll("circle")
+      .data(nodes)
+      .join("circle")
+      .attr("r", d => d.central ? 14 : Math.min(10 + d.peso / 20, 18))
+      .attr("fill", d => {
+        if (d.central) return "#2cc4c9";
+        if (d.classificacao === "Crítico") return "#ff4d4d";
+        if (d.classificacao === "Importante") return "#ffae42";
+        if (d.classificacao === "Secundário") return "#4caf50";
+        return "#999";
+      })
+      .attr("stroke", "#fff")
+      .attr("stroke-width", 1.2)
+      .call(drag(simulation));
+
+    // ===== LABELS =====
+    const label = svg.append("g")
+      .selectAll("text")
+      .data(nodes)
+      .join("text")
+      .text(d => d.central ? "EMPRESA" : d.id.slice(-4))
+      .attr("font-size", "15px")
+      .attr("fill", "#fff")
+      .attr("text-anchor", "middle")
+      .attr("dy", -16);
+
+    // ===== TICK =====
+    simulation.on("tick", () => {
+      link
+        .attr("x1", d => d.source.x)
+        .attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x)
+        .attr("y2", d => d.target.y);
+
+      node
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y);
+
+      label
+        .attr("x", d => d.x)
+        .attr("y", d => d.y);
+    });
+
+    // ===== DRAG =====
+    function drag(simulation) {
+      function dragstarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x;
+        d.fy = d.y;
+      }
+      function dragged(event, d) {
+        d.fx = event.x;
+        d.fy = event.y;
+      }
+      function dragended(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null;
+        d.fy = null;
+      }
+      return d3.drag()
+        .on("start", dragstarted)
+        .on("drag", dragged)
+        .on("end", dragended);
     }
-    if (typeof l.target === "string") {
-      l.target = nodes.find(n => n.id === l.target);
-    }
-  });
-
-  // ===== SIMULAÇÃO =====
-  const simulation = d3.forceSimulation(nodes)
-    .force("link", d3.forceLink(links).id(d => d.id).distance(90))
-    .force("charge", d3.forceManyBody().strength(-220))
-    .force("center", d3.forceCenter(width / 2, height / 2))
-    .force("collision", d3.forceCollide().radius(d => d.central ? 26 : 18));
-
-  // ===== LINKS =====
-  const link = svg.append("g")
-    .attr("stroke", "#b95757")
-    .attr("stroke-opacity", 0.7)
-    .selectAll("line")
-    .data(links)
-    .join("line")
-    .attr("stroke-width", d => Math.max(0.5, d.weight / 1000));
-
-  // ===== NODES =====
-  const node = svg.append("g")
-    .selectAll("circle")
-    .data(nodes)
-    .join("circle")
-    .attr("r", d => d.central ? 14 : Math.min(10 + d.peso / 20, 18))
-    .attr("fill", d => {
-      if (d.central) return "#2cc4c9";
-      if (d.classificacao === "Crítico") return "#ff4d4d";
-      if (d.classificacao === "Importante") return "#ffae42";
-      if (d.classificacao === "Secundário") return "#4caf50";
-      return "#999";
-    })
-    .attr("stroke", "#fff")
-    .attr("stroke-width", 1.2)
-    .call(drag(simulation));
-
-  // ===== LABELS =====
-  const label = svg.append("g")
-    .selectAll("text")
-    .data(nodes)
-    .join("text")
-    .text(d => d.central ? "EMPRESA" : d.id.slice(-4))
-    .attr("font-size", "15px")
-    .attr("fill", "#fff")
-    .attr("text-anchor", "middle")
-    .attr("dy", -16);
-
-  // ===== TICK =====
-  simulation.on("tick", () => {
-    link
-      .attr("x1", d => d.source.x)
-      .attr("y1", d => d.source.y)
-      .attr("x2", d => d.target.x)
-      .attr("y2", d => d.target.y);
-
-    node
-      .attr("cx", d => d.x)
-      .attr("cy", d => d.y);
-
-    label
-      .attr("x", d => d.x)
-      .attr("y", d => d.y);
-  });
-
-  // ===== DRAG =====
-  function drag(simulation) {
-    function dragstarted(event, d) {
-      if (!event.active) simulation.alphaTarget(0.3).restart();
-      d.fx = d.x;
-      d.fy = d.y;
-    }
-    function dragged(event, d) {
-      d.fx = event.x;
-      d.fy = event.y;
-    }
-    function dragended(event, d) {
-      if (!event.active) simulation.alphaTarget(0);
-      d.fx = null;
-      d.fy = null;
-    }
-    return d3.drag()
-      .on("start", dragstarted)
-      .on("drag", dragged)
-      .on("end", dragended);
-  }
-}, [ml2Dados, empresaDados.CNPJ]);
+  }, [ml2Dados, empresaDados.CNPJ]);
 
 
 
@@ -335,9 +354,9 @@ useEffect(() => {
       const height = 250;
 
       const svg = d3.select(mapRef.current)
-                    .append("svg")
-                    .attr("width", width)
-                    .attr("height", height);
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
 
       const projection = d3.geoMercator().fitSize([width, height], geoData);
       const path = d3.geoPath().projection(projection);
@@ -395,10 +414,10 @@ useEffect(() => {
               <strong>Setor:</strong> {empresaDados.setor}
             </p>
             <p>
-              <strong>Saldo Médio:</strong> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(empresaDados.VL_SLDO)}
+              <strong>Saldo Médio:</strong> {formatCurrency(empresaDados.VL_SLDO)}
             </p>
             <p>
-              <strong>Faturamento:</strong> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(empresaDados.VL_FATU)}
+              <strong>Faturamento:</strong> {formatCurrency(empresaDados.VL_FATU)}
             </p>
             <p>
               <strong>Perfil:</strong> {perfil}
@@ -414,7 +433,7 @@ useEffect(() => {
           <div className="indicator-card animate-slide-up">
             <div className="indicator-icon">💰</div>
             <h3>Valor em Aberto</h3>
-            <p className="indicator-value">R$ {empresaDados.VL_CAR.toLocaleString()}</p>
+            <p className="indicator-value">{formatCurrency(empresaDados.VL_CAR)}</p>
           </div>
           <div className="indicator-card animate-slide-up" style={{ animationDelay: "0.1s" }}>
             <div className="indicator-icon">📊</div>
@@ -429,62 +448,145 @@ useEffect(() => {
           <div className="indicator-card animate-slide-up" style={{ animationDelay: "0.3s" }}>
             <div className="indicator-icon">📉</div>
             <h3>PDD</h3>
-            <p className="indicator-value">R$ {empresaDados.VL_PDD.toLocaleString()}</p>
+            <p className="indicator-value">{formatCurrency(empresaDados.VL_PDD)}</p>
           </div>
         </div>
 
-        <div className="dashboard-grid">
-          <div className="card chart-card animate-fade-in" style={{ animationDelay: "0.2s" }}>
+          <div className="card chart-card-criticidade animate-fade-in" style={{ animationDelay: "0.2s" }}>
             <div className="chart-header">
-              <h2>Classificação dos Parceiros</h2>
-              <div className="chart-stats">
-                <span className="stat-label">Total de Parceiros</span>
-                <span className="stat-number">{parceirosData.length}</span>
-              </div>
+              <h2>Matriz de Criticidade das Relações</h2>
+              <div className="chart-subtitle">Análise completa de impactos financeiros</div>
             </div>
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie
-                  data={classificacaoCounts}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={90}
-                  innerRadius={40}
-                  paddingAngle={2}
-                  animationBegin={0}
-                  animationDuration={1200}
-                >
-                  {classificacaoCounts.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="#1f2937" strokeWidth={2} />
-                  ))}
-                </Pie>
-                <Legend
-                  verticalAlign="bottom"
-                  height={36}
-                  iconType="circle"
-                  wrapperStyle={{ fontSize: "12px", color: "#9ca3af" }}
-                />
-                {/* ALTERAÇÃO AQUI - NOVA TOOLTIP */}
-                <Tooltip content={<CustomPieTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
 
-          <div className="card chart-card animate-fade-in" style={{ animationDelay: "0.4s" }}>
-            <div className="chart-header">
-              <h2>Top Parceiros por Peso</h2>
-              <div className="chart-subtitle">Principais relacionamentos comerciais</div>
-            </div>
-            <div className="chart-stats">
-                <span className="stat-label">Volume Total</span>
-                <span className="stat-number">
-                  R$ {ml2Dados.volume_total?.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            <div className="matrix-stats">
+              <div className="stat-item">
+                <span className="stat-label">Total Fornecedores:</span>
+                <span className="stat-value">{ml2Dados.parceiros_pagar?.length || 0}</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-label">Total Clientes:</span>
+                <span className="stat-value">{ml2Dados.parceiros_receber?.length || 0}</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-label">Relações Críticas:</span>
+                <span className="stat-value critical">
+                  {(ml2Dados.parceiros_pagar?.filter(p => p.classificacao === 'Crítico').length || 0) +
+                    (ml2Dados.parceiros_receber?.filter(p => p.classificacao === 'Crítico').length || 0)}
                 </span>
               </div>
+            </div>
+
+            <div className="criticidade-matrix-container">
+              {/* SEÇÃO DE FORNECEDORES - TODOS */}
+              <div className="criticidade-section full-height">
+                <h4 className="section-title risco-pagar">
+                  🔴 RISCO SE NÃO PAGAR
+                  <span className="count-badge">{ml2Dados.parceiros_pagar?.length || 0}</span>
+                </h4>
+                <div className="criticidade-lista-scroll">
+                  {ml2Dados.parceiros_pagar?.length > 0 ? (
+                    ml2Dados.parceiros_pagar.map((parceiro, index) => (
+                      <div key={index} className={`criticidade-item ${parceiro.classificacao.toLowerCase()}`}>
+                        <div className="criticidade-header">
+                          <div className="parceiro-info">
+                            <span className="parceiro-nome">CNPJ...{parceiro.cnpj?.slice(-4)}</span>
+                            <span className="parceiro-posicao">#{index + 1}</span>
+                          </div>
+                          <span className="criticidade-badge">{parceiro.classificacao}</span>
+                        </div>
+
+                        <div className="criticidade-details">
+                          <div className="valor-info">
+                            <span className="valor">{formatCurrency(parceiro.peso)}</span>
+                            <span className="percentual">{formatPercent(parceiro.percentual)}</span>
+                          </div>
+
+                          <div className="score-bar">
+                            <div
+                              className="score-fill"
+                              style={{ width: `${(parceiro.score_criticidade || 0) * 100}%` }}
+                            ></div>
+                            <span className="score-text">Score: {((parceiro.score_criticidade || 0) * 100).toFixed(1)}%</span>
+                          </div>
+                        </div>
+
+                        <div className="impacto-text" title={parceiro.impacto}>
+                         <p>Valor do Impacto</p>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="no-data">Nenhum fornecedor identificado</div>
+                  )}
+                </div>
+              </div>
+
+              {/* SEÇÃO DE CLIENTES - TODOS */}
+              <div className="criticidade-section full-height">
+                <h4 className="section-title risco-receber">
+                  🔴 RISCO SE NÃO RECEBER
+                  <span className="count-badge">{ml2Dados.parceiros_receber?.length || 0}</span>
+                </h4>
+                <div className="criticidade-lista-scroll">
+                  {ml2Dados.parceiros_receber?.length > 0 ? (
+                    ml2Dados.parceiros_receber.map((parceiro, index) => (
+                      <div key={index} className={`criticidade-item ${parceiro.classificacao.toLowerCase()}`}>
+                        <div className="criticidade-header">
+                          <div className="parceiro-info">
+                            <span className="parceiro-nome">CNPJ...{parceiro.cnpj?.slice(-4)}</span>
+                            <span className="parceiro-posicao">#{index + 1}</span>
+                          </div>
+                          <span className="criticidade-badge">{parceiro.classificacao}</span>
+                        </div>
+
+                        <div className="criticidade-details">
+                          <div className="valor-info">
+                            <span className="valor">{formatCurrency(parceiro.peso)}</span>
+                            <span className="percentual">{formatPercent(parceiro.percentual)}</span>
+                          </div>
+
+                          <div className="score-bar">
+                            <div
+                              className="score-fill"
+                              style={{ width: `${(parceiro.score_criticidade || 0) * 100}%` }}
+                            ></div>
+                            <span className="score-text">Score: {((parceiro.score_criticidade || 0) * 100).toFixed(1)}%</span>
+                          </div>
+                        </div>
+
+                        <div className="impacto-text" title={parceiro.impacto}>
+                          <p>Valor do Impacto</p>
+                          
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="no-data">Nenhum cliente identificado</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+
+        <div className="dashboard-grid">
+          <div className="card chart-card animate-fade-in" style={{ animationDelay: "0.4s" }}>
+            <div className="chart-header">
+              <h2>Principais Empresas a pagar</h2>
+              <div className="chart-subtitle">relacionamentos comerciais</div>
+            </div>
+            <div className="chart-stats">
+              <span className="stat-label">Total a Pagar</span>
+              <span className="stat-number">
+                {formatCurrency(ml2Dados.total_a_pagar)}
+              </span>
+            </div>
             <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={parceirosData.slice(0, 5)} layout="vertical" margin={{ left: 60 }}>
+              <BarChart
+                data={ml2Dados.parceiros_pagar?.slice(0, 5) || []}
+                layout="vertical"
+                margin={{ left: 80, right: 20 }}
+              >
                 <defs>
                   <linearGradient id="barGradient" x1="0" y1="0" x2="1" y2="0">
                     <stop offset="5%" stopColor="#dc2626" stopOpacity={0.8} />
@@ -492,16 +594,21 @@ useEffect(() => {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeOpacity={0.3} />
-                <XAxis type="number" stroke="#9ca3af" fontSize={12} />
+                <XAxis
+                  type="number"
+                  stroke="#9ca3af"
+                  fontSize={12}
+                  tickFormatter={(value) => formatCurrency(value)}
+                />
                 <YAxis
-                  dataKey="name"
+                  dataKey="cnpj"
                   type="category"
                   stroke="#9ca3af"
                   fontSize={10}
-                  width={50}
-                  tickFormatter={(value) => value.slice(-4)}
+                  width={70}
+                  tickFormatter={(value) => value?.slice(-4) || ''}
                 />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip content={<CustomBarTooltip />} />
                 <Bar
                   dataKey="peso"
                   fill="url(#barGradient)"
@@ -513,41 +620,57 @@ useEffect(() => {
             </ResponsiveContainer>
           </div>
 
-          <div className="card chart-card animate-fade-in" style={{ animationDelay: "0.6s" }}>
+          <div className="card chart-card animate-fade-in">
             <div className="chart-header">
-              <h2>Métricas da Empresa</h2>
-              <div className="chart-subtitle">Análise multidimensional</div>
+              <h2>Principais Empresas a receber</h2>
+              <div className="chart-subtitle">Principais fontes de receita</div>
+            </div>
+            <div className="chart-stats">
+              <span className="stat-label">Total a Receber</span>
+              <span className="stat-number-receber">
+                {formatCurrency(ml2Dados.total_a_receber)}
+              </span>
             </div>
             <ResponsiveContainer width="100%" height={280}>
-              <RadarChart data={radarData} margin={{ top: 20, right: 30, bottom: 20, left: 30 }}>
-                <PolarGrid stroke="#374151" strokeOpacity={0.3} />
-                <PolarAngleAxis dataKey="metric" tick={{ fontSize: 12, fill: "#9ca3af" }} />
-                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10, fill: "#6b7280" }} />
-                <Radar
-                  dataKey="value"
-                  stroke="#dc2626"
-                  fill="#dc2626"
-                  fillOpacity={0.3}
-                  strokeWidth={2}
-                  animationDuration={1500}
+              <BarChart
+                data={ml2Dados.parceiros_receber?.slice(0, 5) || []}
+                layout="vertical"
+                margin={{ left: 80, right: 20 }}
+              >
+                <defs>
+                  <linearGradient id="top5Gradient" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="5%" stopColor="#54e76dff" stopOpacity={0.8} />
+                    <stop offset="95%" stopColor="#079e28ff" stopOpacity={1} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" strokeOpacity={0.3} />
+                <XAxis
+                  type="number"
+                  stroke="#9ca3af"
+                  fontSize={12}
+                  tickFormatter={(value) => formatCurrency(value)}
                 />
-                <Tooltip content={<CustomTooltip />} />
-              </RadarChart>
+                <YAxis
+                  dataKey="cnpj"
+                  type="category"
+                  stroke="#9ca3af"
+                  fontSize={10}
+                  width={70}
+                  tickFormatter={(value) => value?.slice(-4) || ''}
+                />
+                <Tooltip content={<CustomBarTooltip />} />
+                <Bar
+                  dataKey="peso"
+                  fill="url(#top5Gradient)"
+                  radius={[0, 4, 4, 0]}
+                />
+              </BarChart>
             </ResponsiveContainer>
           </div>
-
-          <div className="card chart-card animate-fade-in" style={{ animationDelay: "0.8s" }}>
-            <div className="chart-header">
-              <h2>Rede de Parceiros</h2>
-              <div className="chart-subtitle">Mapeamento de relacionamentos</div>
-            </div>
-            <div className="network-container">
-              <div ref={networkRef} style={{ width: "100%", height: "280px" }}></div>
-            </div>
-          </div>
-
+        </div>
+          <div className="localizacao-container">
           <div className="card chart-card map-card animate-fade-in" style={{ animationDelay: "1s" }}>
-            <div className="chart-header">
+            <div className="chart-header map">
               <h2>Localização da Empresa</h2>
               <div className="chart-subtitle">Distribuição geográfica</div>
             </div>

@@ -61,13 +61,13 @@ def carregar_dados():
     global df, df_ml2, ml1_model, ml3_model, scaler, ds_cnae_map
     global G, grau_centralidade, betweenness_centralidade, closeness_centralidade, empresa_info_cache
 
-    # --- ML1 + ML3 no mesmo dataset ---
+    # --- ML1 + ML3 ---
     df = pd.read_excel(ARQUIVO_DADOS, sheet_name="ML1", dtype={"ID": str})
     df["ID"] = df["ID"].astype(str).str.strip().str.upper()
     df['DS_CNAE'] = df['DS_CNAE'].astype(str).apply(normalizar)
     df['IDADE_EMPRESA'] = (datetime.now() - pd.to_datetime(df['DT_ABRT'])).dt.days / 365
 
-    # Criar cache de informações das empresas
+    # Criar cache de informações
     for _, row in df.iterrows():
         empresa_info_cache[row["ID"]] = {
             'VL_FATU': row.get('VL_FATU', 0),
@@ -103,7 +103,7 @@ def carregar_dados():
         ml3_model.fit(Xp_train, yp_train)
         yp_pred = ml3_model.predict(Xp_test)
         acc3 = accuracy_score(yp_test, yp_pred)
-        print(f"[INFO] Modelo ML3 (Recomendação de Produtos) treinado. Acurácia: {acc3:.2f}")
+        print(f"[INFO] Modelo ML3 treinado. Acurácia: {acc3:.2f}")
     else:
         print("[WARN] Coluna Produto_recomendado não encontrada na aba ML1")
 
@@ -123,138 +123,175 @@ def carregar_dados():
 
 carregar_dados()
 
-# ===== Classificação de Parceiro =====
-def classificar_parceiro(vl_unitario, vl_total_receber, saldo, faturamento, vl_car):
-    vl_total_receber = max(vl_total_receber, 1)
-    saldo = max(saldo, 1)
-    faturamento = max(faturamento, 1)
-    vl_car = max(vl_car, 1)
-
-    if saldo < faturamento * 0.01:
-        saldo_ajustado = faturamento * 0.05
+# ===== Nova função: Classificar Criticidade da Relação =====
+# ===== Nova função: Classificar Criticidade da Relação CORRIGIDA =====
+def classificar_criticidade_relacao(tipo, peso, total_grupo, faturamento_empresa, saldo_empresa, vl_car_empresa):
+    """
+    Classifica a criticidade de uma relação comercial considerando múltiplos fatores
+    """
+    # Evitar divisão por zero
+    total_grupo = max(total_grupo, 1)
+    faturamento_empresa = max(faturamento_empresa, 1)
+    saldo_empresa = max(saldo_empresa, 1)
+    vl_car_empresa = max(vl_car_empresa, 0)
+    
+    # FATOR 1: Concentração no grupo (dependência)
+    concentracao_grupo = (peso / total_grupo) * 100  # Percentual no total do grupo
+    
+    # FATOR 2: Impacto no faturamento (para recebimentos)
+    if tipo == 'receber':
+        impacto_faturamento = (peso / faturamento_empresa) * 100
     else:
-        saldo_ajustado = saldo
-
-    proporcao_financeira = vl_unitario / vl_total_receber
-    fator_tamanho = min(1.0, (vl_unitario / faturamento) * 100)
-    impacto_financeiro = (proporcao_financeira * fator_tamanho) * 0.30
-
-    percentual_faturamento = vl_unitario / faturamento
-    if percentual_faturamento > 0.1:
-        impacto_faturamento = 0.25
-    elif percentual_faturamento > 0.05:
-        impacto_faturamento = 0.20
-    elif percentual_faturamento > 0.02:
-        impacto_faturamento = 0.15
-    elif percentual_faturamento > 0.01:
-        impacto_faturamento = 0.10
-    elif percentual_faturamento > 0.005:
-        impacto_faturamento = 0.05
+        impacto_faturamento = 0
+    
+    # FATOR 3: Impacto na liquidez (para pagamentos)
+    if tipo == 'pagar':
+        liquidez_disponivel = max(saldo_empresa - vl_car_empresa, saldo_empresa * 0.1)
+        impacto_liquidez = (peso / liquidez_disponivel) * 100 if liquidez_disponivel > 0 else 100
     else:
-        impacto_faturamento = percentual_faturamento * 10
-
-    liquidez_efetiva = max(saldo_ajustado - vl_car, saldo_ajustado * 0.05, faturamento * 0.03)
-    percentual_liquidez = vl_unitario / liquidez_efetiva
-    if percentual_liquidez > 0.5:
-        impacto_liquidez = 0.25
-    elif percentual_liquidez > 0.25:
-        impacto_liquidez = 0.20
-    elif percentual_liquidez > 0.1:
-        impacto_liquidez = 0.15
-    elif percentual_liquidez > 0.05:
-        impacto_liquidez = 0.10
-    elif percentual_liquidez > 0.02:
-        impacto_liquidez = 0.05
+        impacto_liquidez = 0
+    
+    # FATOR 4: Risco de concentração (quanto maior a participação, maior o risco)
+    risco_concentracao = min(concentracao_grupo / 25, 1.0)  # Normalizado para 0-1
+    
+    # FATOR 5: Impacto financeiro geral
+    if tipo == 'receber':
+        impacto_financeiro = min(impacto_faturamento / 15, 1.0)  # >15% do faturamento é crítico
     else:
-        impacto_liquidez = percentual_liquidez * 2.5
-
-    alavancagem = min(vl_car / (saldo_ajustado + 1), 1.5)
-    vulnerabilidade_base = (vl_unitario / faturamento) * alavancagem
-    if vulnerabilidade_base > 0.1:
-        fator_vulnerabilidade = 0.20
-    elif vulnerabilidade_base > 0.05:
-        fator_vulnerabilidade = 0.15
-    elif vulnerabilidade_base > 0.02:
-        fator_vulnerabilidade = 0.10
-    elif vulnerabilidade_base > 0.01:
-        fator_vulnerabilidade = 0.05
-    elif vulnerabilidade_base > 0.005:
-        fator_vulnerabilidade = 0.02
+        impacto_financeiro = min(impacto_liquidez / 30, 1.0)  # >30% da liquidez é crítico
+    
+    # FATOR 6: Importância estratégica (relações muito significativas)
+    importancia_estrategica = 1 if concentracao_grupo > 20 else concentracao_grupo / 20
+    
+    # CÁLCULO DO SCORE FINAL (ponderando os fatores)
+    if tipo == 'receber':
+        # Para recebimentos: concentração + impacto no faturamento são mais importantes
+        score_final = (
+            risco_concentracao * 0.4 +
+            impacto_financeiro * 0.4 + 
+            importancia_estrategica * 0.2
+        )
     else:
-        fator_vulnerabilidade = vulnerabilidade_base * 4
-
-    indice = impacto_financeiro + impacto_faturamento + impacto_liquidez + fator_vulnerabilidade
-
-    if indice >= 0.50:
-        return "Crítico", round(indice, 4)
-    elif indice >= 0.25:
-        return "Importante", round(indice, 4)
+        # Para pagamentos: impacto na liquidez é mais importante
+        score_final = (
+            risco_concentracao * 0.3 +
+            impacto_financeiro * 0.5 +
+            importancia_estrategica * 0.2
+        )
+    
+    # CLASSIFICAÇÃO BASEADA NO SCORE
+    if score_final >= 0.7:
+        classificacao = "Crítico"
+        if tipo == 'receber':
+            impacto_desc = f"Perda de {impacto_faturamento:.1f}% do faturamento"
+        else:
+            impacto_desc = f"Compromete {impacto_liquidez:.1f}% da liquidez"
+    elif score_final >= 0.5:
+        classificacao = "Alto"
+        if tipo == 'receber':
+            impacto_desc = f"Impacto significativo no faturamento ({impacto_faturamento:.1f}%)"
+        else:
+            impacto_desc = f"Alto impacto na liquidez ({impacto_liquidez:.1f}%)"
+    elif score_final >= 0.3:
+        classificacao = "Moderado"
+        impacto_desc = "Impacto moderado nas operações"
     else:
-        return "Secundário", round(indice, 4)
+        classificacao = "Baixo"
+        impacto_desc = "Impacto limitado"
+    
+    return classificacao, round(score_final, 3), impacto_desc, {
+        'concentracao_grupo': round(concentracao_grupo, 1),
+        'impacto_faturamento': round(impacto_faturamento, 1) if tipo == 'receber' else 0,
+        'impacto_liquidez': round(impacto_liquidez, 1) if tipo == 'pagar' else 0
+    }
 
-# ===== Analisar rede ML2 com saldo médio =====
+# ===== ATUALIZAR função analisar_rede =====
 def analisar_rede(cnpj):
     cnpj = cnpj.strip().upper()
     if cnpj not in G.nodes:
-        return {"parceiros_totais": 0, "volume_total": 0, "principais_parceiros": [], 
-                "centralidade": None, "risco_rede": "Não encontrado"}
+        return {
+            "parceiros_totais": 0,
+            "volume_total": 0,
+            "principais_parceiros": [],
+            "parceiros_pagar": [],
+            "parceiros_receber": [],
+            "matriz_risco": [],
+            "centralidade": None,
+            "risco_rede": "Não encontrado"
+        }
 
+    # Buscar informações financeiras da empresa
+    info_empresa = empresa_info_cache.get(cnpj, {})
+    faturamento = info_empresa.get('VL_FATU', 1)
+    saldo = info_empresa.get('VL_SLDO', 1)
+    vl_car = info_empresa.get('VL_CAR', 0)
+
+    # --- Empresas que o CNPJ PAGA ---
+    out_edges = list(G.out_edges(cnpj, data=True))
+    # --- Empresas que o CNPJ RECEBE ---
     in_edges = list(G.in_edges(cnpj, data=True))
-    vl_total_receber = sum([d["weight"] for _, _, d in in_edges])
 
-    # Calcular saldo médio da empresa que recebe
-    saldos = []
-    empresa_info = empresa_info_cache.get(cnpj, {})
-    saldos.append(empresa_info.get('VL_SLDO', 0))
-    vl_saldo_medio = np.mean(saldos) if saldos else 0
+    # Cálculo de totais
+    total_a_pagar = sum([d["weight"] for _, _, d in out_edges])
+    total_a_receber = sum([d["weight"] for _, _, d in in_edges])
+    volume_total = total_a_pagar + total_a_receber
 
-    parceiros_valores = []
-    for u, _, d in in_edges:
-        peso = float(d["weight"])
-        classificacao, indice = classificar_parceiro(
-            vl_unitario=peso,
-            vl_total_receber=vl_total_receber,
-            saldo=vl_saldo_medio,
-            faturamento=empresa_info.get('VL_FATU', 0),
-            vl_car=empresa_info.get('VL_CAR', 0)
+    # Classificação de parceiros que a empresa PAGA (fornecedores)
+    parceiros_pagar = []
+    for _, dest, d in out_edges:
+        percentual = (d["weight"] / total_a_pagar * 100) if total_a_pagar > 0 else 0
+        
+        # Classificar criticidade COM NOVA LÓGICA
+        classificacao, score, impacto, detalhes = classificar_criticidade_relacao(
+            'pagar', d["weight"], total_a_pagar, faturamento, saldo, vl_car
         )
-        parceiros_valores.append({
-            "cnpj": u,
-            "peso": peso,
+        
+        parceiros_pagar.append({
+            "cnpj": dest,
+            "peso": d["weight"],
+            "percentual": round(percentual, 2),
             "classificacao": classificacao,
-            "indice_criticidade": indice
+            "score_criticidade": score,
+            "impacto": impacto,
+            "tipo": "fornecedor",
+            "risco": "Não Pagar",
+            "detalhes": detalhes
         })
 
-    parceiros_valores = sorted(parceiros_valores, key=lambda x: x["peso"], reverse=True)
-
-    centralidade = {
-        "grau": float(grau_centralidade.get(cnpj, 0)),
-        "betweenness": float(betweenness_centralidade.get(cnpj, 0)),
-        "closeness": float(closeness_centralidade.get(cnpj, 0))
-    }
-
-    risco = "Baixo"
-    if centralidade["betweenness"] > 0.1 or len(parceiros_valores) < 2:
-        risco = "Alto"
-    elif centralidade["grau"] < 0.05:
-        risco = "Médio"
+    # Classificação de parceiros que a empresa RECEBE (clientes)
+    parceiros_receber = []
+    for orig, _, d in in_edges:
+        percentual = (d["weight"] / total_a_receber * 100) if total_a_receber > 0 else 0
+        
+        # Classificar criticidade COM NOVA LÓGICA
+        classificacao, score, impacto, detalhes = classificar_criticidade_relacao(
+            'receber', d["weight"], total_a_receber, faturamento, saldo, vl_car
+        )
+        
+        parceiros_receber.append({
+            "cnpj": orig,
+            "peso": d["weight"],
+            "percentual": round(percentual, 2),
+            "classificacao": classificacao,
+            "score_criticidade": score,
+            "impacto": impacto,
+            "tipo": "cliente",
+            "risco": "Não Receber",
+            "detalhes": detalhes
+        })
 
     return {
-        "parceiros_totais": len(set([p["cnpj"] for p in parceiros_valores])),
-        "volume_total": float(vl_total_receber),
-        "principais_parceiros": parceiros_valores,
-        "centralidade": centralidade,
-        "risco_rede": risco,
-        "dados_empresa": {
-            "faturamento": float(empresa_info.get('VL_FATU', 0)),
-            "saldo": float(vl_saldo_medio),
-            "vl_car": float(empresa_info.get('VL_CAR', 0))
-        }
+        "parceiros_totais": len(out_edges) + len(in_edges),
+        "volume_total": volume_total,
+        "total_a_pagar": total_a_pagar,
+        "total_a_receber": total_a_receber,
+        "parceiros_pagar": sorted(parceiros_pagar, key=lambda x: x["score_criticidade"], reverse=True),
+        "parceiros_receber": sorted(parceiros_receber, key=lambda x: x["score_criticidade"], reverse=True),
+        "centralidade": nx.degree_centrality(G).get(cnpj, 0),
+        "risco_rede": "Alto" if total_a_pagar > total_a_receber * 1.5 else "Normal"
     }
-
 # ===== Inicializar API =====
-app = FastAPI(title="API de Predição de Empresa", version="3.2.0")
-
+app = FastAPI(title="API de Predição de Empresa", version="3.3.0")
 app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"]
 )
@@ -274,12 +311,10 @@ async def predict(data: IDRequest):
     produto_recomendado = None
 
     if not empresa.empty:
-        # Média do saldo
         vl_sldo_media = empresa["VL_SLDO"].mean()
         row = empresa.iloc[0]
         ds_cnae_code = ds_cnae_map.get(row['DS_CNAE'], -1)
 
-        # Construir input ML1
         X_input = scaler.transform([[row['VL_FATU'], vl_sldo_media, row['IDADE_EMPRESA']]])
         X_input = np.append(X_input, ds_cnae_code).reshape(1, -1)
         perfil_predito = ml1_model.predict(X_input)[0]
@@ -310,5 +345,24 @@ async def predict(data: IDRequest):
         }
 
     ml2_result = analisar_rede(id_input)
-
     return {"ID": id_input, "ML1": ml1_result, "ML2": ml2_result}
+
+# ===== Health Check =====
+@app.get("/")
+async def root():
+    return {"message": "API de Predição de Empresa - Versão 3.3.0"}
+
+# ===== Health Check Detalhado =====
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "model_loaded": ml1_model is not None,
+        "graph_loaded": G is not None,
+        "empresas_carregadas": len(df) if df is not None else 0,
+        "relacoes_carregadas": len(df_ml2) if df_ml2 is not None else 0
+    }
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
