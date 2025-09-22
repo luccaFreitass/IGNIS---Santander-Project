@@ -1,0 +1,3 @@
+Calculo da relação dos parceiros
+    Calcula a relação usando um índice composto:
+        Relacao = α * (peso / vl_total_receber) + β * (vl_unit_receber / faturamento) + γ * (vl_unit_receber / saldo)

@@ -411,6 +411,65 @@
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
+.custom-pie-tooltip {
+  background: rgba(31, 41, 55, 0.95);
+  border: 1px solid #4b5563;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(4px);
+  max-width: 250px;
+}
+
+.tooltip-header {
+  font-weight: bold;
+  color: #f3f4f6;
+  margin-bottom: 4px;
+  font-size: 14px;
+  text-transform: uppercase;
+}
+
+.tooltip-count {
+  color: #9ca3af;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.tooltip-companies {
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+.company-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid #4b5563;
+}
+
+.company-item:last-child {
+  border-bottom: none;
+}
+
+.company-cnpj {
+  color: #e5e7eb;
+  font-size: 11px;
+}
+
+.company-value {
+  color: #22c55e;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.tooltip-more {
+  color: #9ca3af;
+  font-size: 11px;
+  margin-top: 4px;
+  text-align: center;
+}
+
 /* Enhanced responsive design */
 @media (max-width: 1200px) {
   .dashboard-grid {

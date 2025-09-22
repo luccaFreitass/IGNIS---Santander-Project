@@ -38,6 +38,7 @@ function Risco() {
     setor: "",
     alertas: "",
     VL_CAR: 0,
+    VL_FATU: 0,
     Score_cliente: null,
     Faixa_risco: "",
     Percentual_PDD: "0%",
@@ -76,6 +77,7 @@ function Risco() {
         alertas: data.ML1?.alertas || "Nenhuma fraude detectada",
         VL_CAR: data.ML1?.VL_CAR || 0,
         VL_SLDO: data.ML1?.VL_SLDO || 0,
+        VL_FATU: data.ML1?.VL_FATU || 0,
         Score_cliente: data.ML1?.Score_cliente || null,
         Faixa_risco: data.ML1?.Faixa_risco || "-",
         Percentual_PDD: data.ML1?.Percentual_PDD || "0%",
@@ -96,6 +98,7 @@ function Risco() {
         alertas: "",
         VL_CAR: 0,
         VL_SLDO: 0,
+        VL_FATU: 0,
         Score_cliente: null,
         Faixa_risco: "",
         Percentual_PDD: "0%",
@@ -161,6 +164,39 @@ function Risco() {
     }
     return null
   }
+
+  // NOVA TOOLTIP PERSONALIZADA PARA O GRÁFICO DE PIZZA
+  const CustomPieTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const classificacao = payload[0].name;
+      const empresas = parceirosData
+        .filter(p => p.classificacao === classificacao)
+        .map(p => ({
+          cnpj: p.name,
+          valor: p.peso
+        }));
+
+      return (
+        <div className="custom-pie-tooltip">
+          <p className="tooltip-header">{classificacao}</p>
+          <p className="tooltip-count">{payload[0].value} parceiro(s)</p>
+          <div className="tooltip-companies">
+            {empresas.slice(0, 5).map((empresa, index) => (
+              <div key={index} className="company-item">
+                <span className="company-cnpj">CNPJ: ...{empresa.cnpj.slice(-4)}</span>
+                <span className="company-value">R$ {empresa.valor.toLocaleString('pt-BR')}</span>
+              </div>
+            ))}
+            {empresas.length > 5 && (
+              <p className="tooltip-more">+ {empresas.length - 5} outros</p>
+            )}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
 // ---------------------- D3: Rede de parceiros ----------------------
 useEffect(() => {
   if (!ml2Dados.principais_parceiros || ml2Dados.principais_parceiros.length === 0) return;
@@ -359,8 +395,10 @@ useEffect(() => {
               <strong>Setor:</strong> {empresaDados.setor}
             </p>
             <p>
-              <strong>Saldo em Conta:</strong> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(empresaDados.VL_SLDO)}
-
+              <strong>Saldo Médio:</strong> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(empresaDados.VL_SLDO)}
+            </p>
+            <p>
+              <strong>Faturamento:</strong> {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(empresaDados.VL_FATU)}
             </p>
             <p>
               <strong>Perfil:</strong> {perfil}
@@ -428,7 +466,8 @@ useEffect(() => {
                   iconType="circle"
                   wrapperStyle={{ fontSize: "12px", color: "#9ca3af" }}
                 />
-                <Tooltip content={<CustomTooltip />} />
+                {/* ALTERAÇÃO AQUI - NOVA TOOLTIP */}
+                <Tooltip content={<CustomPieTooltip />} />
               </PieChart>
             </ResponsiveContainer>
           </div>
