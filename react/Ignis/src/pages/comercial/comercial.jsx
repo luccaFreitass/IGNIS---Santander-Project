@@ -14,6 +14,7 @@ function Comercial() {
     CNPJ: "",
     VL_CAR: 0,
     VL_SLDO: 0,
+    VL_FATU: 0,
     Faixa_risco: "",
     Estado: "",
     razaoSocial: "-",
@@ -49,6 +50,7 @@ function Comercial() {
         CNPJ: data.ID || "-",
         VL_CAR: data.ML1?.VL_CAR || 0,
         VL_SLDO: data.ML1?.VL_SLDO || 0,
+        VL_FATU: data.ML1?.VL_FATU || 0,
         Faixa_risco: data.ML1?.Faixa_risco || "-",
         Estado: data.ML1?.Estado || "",
         razaoSocial: data.ML1?.razaoSocial || "-",
@@ -75,6 +77,7 @@ function Comercial() {
         CNPJ: "",
         VL_CAR: 0,
         VL_SLDO: 0,
+        VL_FATU: 0,
         Faixa_risco: "",
         Estado: "",
         razaoSocial: "-",
@@ -89,6 +92,14 @@ function Comercial() {
       setLoading(false)
     }
   }
+
+  // Funções auxiliares de formatação
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(value || 0);
+  };
 
   // Desenhar mapa da localização
   useEffect(() => {
@@ -163,6 +174,9 @@ function Comercial() {
               </p>
               <p>
                 <strong>Razão Social:</strong> {empresaDados.razaoSocial}
+              </p>
+              <p>
+                <strong>Faturamento: </strong> {formatCurrency(empresaDados.VL_FATU)}
               </p>
               <p>
                 <strong>Setor:</strong> {empresaDados.setor}

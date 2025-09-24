@@ -309,25 +309,48 @@ async def predict(data: IDRequest):
     empresa = df[df["ID"] == id_input]
     ml1_result = {}
     produto_recomendado = None
+    features_usadas_ml1 = {}
+    features_usadas_ml3 = {}
 
     if not empresa.empty:
         vl_sldo_media = empresa["VL_SLDO"].mean()
         row = empresa.iloc[0]
         ds_cnae_code = ds_cnae_map.get(row['DS_CNAE'], -1)
 
-        X_input = scaler.transform([[row['VL_FATU'], vl_sldo_media, row['IDADE_EMPRESA']]])
-        X_input = np.append(X_input, ds_cnae_code).reshape(1, -1)
-        perfil_predito = ml1_model.predict(X_input)[0]
+        # ===== Preparar entrada para ML1 =====
+        X_input_base = [row['VL_FATU'], vl_sldo_media, row['IDADE_EMPRESA']]
+        X_scaled = scaler.transform([X_input_base])
+        X_input = np.append(X_scaled, ds_cnae_code).reshape(1, -1)
 
+        # ===== Features usadas por ML1 =====
+        features_usadas_ml1 = {
+            "VL_FATU": float(row['VL_FATU']),
+            "VL_SLDO_media": float(vl_sldo_media),
+            "IDADE_EMPRESA": float(row['IDADE_EMPRESA']),
+            "DS_CNAE_CODE": int(ds_cnae_code)
+        }
+
+        # ===== Previsão ML1 =====
+        perfil_predito = ml1_model.predict(X_input)[0]
+        print(f"[DEBUG][ML1] Features usadas: {features_usadas_ml1}")
+        print(f"[DEBUG][ML1] Perfil predito: {perfil_predito}")
+
+        # ===== Alertas e cálculos adicionais =====
         alerta = row.get("PREV", "Nenhuma fraude detectada") or "Nenhuma fraude detectada"
         vl_car = row.get("VL_CAR", 0)
         percentual_pdd = row.get("Percentual_PDD", "0%")
         vl_pdd = calcular_pdd(vl_car, percentual_pdd)
         estado = row.get("Estado", "")
 
+        # ===== Previsão ML3 =====
         if ml3_model:
             produto_recomendado = ml3_model.predict(X_input)[0]
+            features_usadas_ml3 = features_usadas_ml1.copy()
 
+            print(f"[DEBUG][ML3] Features usadas: {features_usadas_ml3}")
+            print(f"[DEBUG][ML3] Produto recomendado: {produto_recomendado}")
+
+        # ===== Montar resultado ML1 =====
         ml1_result = {
             "razaoSocial": "Empresa Fictícia",
             "setor": row['DS_CNAE'],
@@ -341,10 +364,14 @@ async def predict(data: IDRequest):
             "Percentual_PDD": str(percentual_pdd),
             "VL_PDD": to_native(vl_pdd),
             "Estado": str(estado),
-            "Produto_recomendado": str(produto_recomendado) if produto_recomendado else "Não disponível"
+            "Produto_recomendado": str(produto_recomendado) if produto_recomendado else "Não disponível",
+            "Features_usadas_ML1": features_usadas_ml1,
+            "Features_usadas_ML3": features_usadas_ml3 if ml3_model else {}
         }
 
+    # ===== Análise de Rede (ML2) =====
     ml2_result = analisar_rede(id_input)
+
     return {"ID": id_input, "ML1": ml1_result, "ML2": ml2_result}
 
 # ===== Health Check =====
